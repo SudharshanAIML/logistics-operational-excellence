@@ -64,8 +64,20 @@ def run_hub_simulation(
         active_hc = sum(1 for _ in range(hc) if random.random() >= sick_prob)
         actual_headcounts[p] = max(1, active_hc) # at least 1 person per process
         
-    # Scale package arrival rate based on surge
-    base_arrival_rate_per_min = (1200 / 60.0) # 1200 packages/hour base
+    # Scale package arrival rate based on surge. The baseline rate is derived
+    # from the pipeline's own bottleneck stage capacity (min headcount x UPH
+    # across the 6 sequential stages) rather than a hardcoded "1200 packages/hour"
+    # that was never checked against base_headcounts/uph_standards above - that
+    # mismatch meant the hub was overloaded (arrival > capacity) at EVERY point
+    # in the slider range, including the most favorable settings, so OEI always
+    # collapsed to 0 and the sliders couldn't visibly change anything.
+    # Targeting 75% of bottleneck capacity at 0% surge gives a busy-but-stable
+    # baseline, with room for the surge slider to meaningfully show overload.
+    bottleneck_capacity_per_min = min(
+        base_headcounts[p] * uph_standards[p] / 60.0 for p in uph_standards
+    )
+    TARGET_BASELINE_UTILIZATION = 0.75
+    base_arrival_rate_per_min = bottleneck_capacity_per_min * TARGET_BASELINE_UTILIZATION
     arrival_rate = base_arrival_rate_per_min * (1.0 + inbound_surge_pct / 100.0)
     
     iteration_results = []
