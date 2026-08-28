@@ -41,10 +41,41 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [activeTab, setActiveTab] = useState<TabType>('command-center');
-  const [selectedHub, setSelectedHub] = useState<string>('Chennai GH-01');
+  const [selectedHub, setSelectedHub] = useState<string>('Hub 402-ATL');
   const [selectedShift, setSelectedShift] = useState<string>('Day');
   const [selectedDate, setSelectedDate] = useState<string>('2026-08-28');
-  const [alerts, setAlerts] = useState<AlertItem[]>([]);
+  const [alerts, setAlerts] = useState<AlertItem[]>([
+    {
+      alert_id: 'alt-001',
+      timestamp: '2026-08-28 10:02:00',
+      process: 'unload',
+      zone: 'Sort A Merge',
+      severity: 'risk',
+      alert_type: 'Jammed Conveyor C-14',
+      message: 'Sensor fault detected on C-14 merge lane. Backing up into Sort A.',
+      status: 'active'
+    },
+    {
+      alert_id: 'alt-002',
+      timestamp: '2026-08-28 09:45:00',
+      process: 'unload',
+      zone: 'Bay 4',
+      severity: 'risk',
+      alert_type: 'Unload Bay 4 Undermanned',
+      message: 'Processing rate dropped below 200pk/hr threshold. -2 headcount gap.',
+      status: 'active'
+    },
+    {
+      alert_id: 'alt-003',
+      timestamp: '2026-08-28 09:15:00',
+      process: 'inbound',
+      zone: 'Gate Ramp',
+      severity: 'watch',
+      alert_type: 'Trailer T-4921 Delayed',
+      message: 'Inbound trailer ETA revised. +15m delay due to gate congestion.',
+      status: 'active'
+    }
+  ]);
   const [privacyFloor, setPrivacyFloor] = useState<number>(5);
   const [wsData, setWsData] = useState<any>(null);
 

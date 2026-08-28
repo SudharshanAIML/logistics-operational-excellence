@@ -1,25 +1,26 @@
-@import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700&family=Barlow:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap');
+@import "tailwindcss";
+@config "../tailwind.config.js";
 
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+body {
+  background-color: #fff8f6;
+  color: #1F1512;
+  font-family: Barlow, sans-serif;
+  font-size: 14px;
+  line-height: 22px;
+  -webkit-font-smoothing: antialiased;
+}
 
-@layer base {
-  body {
-    @apply bg-surface text-textMain font-ui antialiased selection:bg-brand-gold selection:text-brand-brown;
-    font-size: 14px;
-    line-height: 22px;
-  }
-  
-  h1, h2, h3, h4, h5, h6 {
-    @apply font-display font-semibold uppercase tracking-wide text-brand-brown;
-  }
-  
-  /* Monospaced numerals for all metric fields */
-  .tabular-nums {
-    font-family: 'IBM Plex Mono', monospace;
-    font-variant-numeric: tabular-nums;
-  }
+h1, h2, h3, h4, h5, h6 {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.025em;
+  color: #351C15;
+}
+
+.tabular-nums {
+  font-family: 'IBM Plex Mono', monospace;
+  font-variant-numeric: tabular-nums;
 }
 
 /* Custom scrollbars */
