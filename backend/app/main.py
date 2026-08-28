@@ -1,0 +1,92 @@
+import asyncio
+import json
+import random
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi.middleware.cors import CORSMiddleware
+from backend.app.api.router import api_router
+
+app = FastAPI(
+    title="Synapse Ops API",
+    description="UPS Ground Hub Operations Intelligence Platform API",
+    version="1.0.0"
+)
+
+# CORS Configuration for React Frontend
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"], # for local development demo
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Mount Routers
+app.include_router(api_router, prefix="/api")
+
+@app.get("/")
+def read_root():
+    return {"message": "Welcome to Synapse Ops API. Navigate to /docs for Swagger documentation."}
+
+# Active WebSocket connections list
+class ConnectionManager:
+    def __init__(self):
+        self.active_connections: list[WebSocket] = []
+
+    async def connect(self, websocket: WebSocket):
+        await websocket.accept()
+        self.active_connections.append(websocket)
+
+    def disconnect(self, websocket: WebSocket):
+        self.active_connections.remove(websocket)
+
+    async def broadcast(self, message: str):
+        for connection in self.active_connections:
+            try:
+                await connection.send_text(message)
+            except Exception:
+                # remove stale connections
+                self.disconnect(connection)
+
+manager = ConnectionManager()
+
+# Background task to stream live mock metrics over WebSocket
+async def stream_live_ops_updates():
+    while True:
+        await asyncio.sleep(5.0) # Send updates every 5 seconds
+        if manager.active_connections:
+            # Generate subtle fluctuations in UPH and volumes to make UI look alive
+            live_data = {
+                "type": "live_telemetry",
+                "timestamp": asyncio.get_event_loop().time(),
+                "metrics": {
+                    "unload_uph": round(random.uniform(135.0, 148.0), 1),
+                    "sort_uph": round(random.uniform(310.0, 335.0), 1),
+                    "stow_uph": round(random.uniform(105.0, 116.0), 1),
+                    "pick_uph": round(random.uniform(175.0, 185.0), 1),
+                    "pack_uph": round(random.uniform(146.0, 154.0), 1),
+                    "load_uph": round(random.uniform(195.0, 205.0), 1),
+                    "active_alerts_count": random.choice([2, 3, 4])
+                }
+            }
+            await manager.broadcast(json.dumps(live_data))
+
+@app.websocket("/ws/live")
+async def websocket_endpoint(websocket: WebSocket):
+    await manager.connect(websocket)
+    try:
+        # Send initial status
+        await websocket.send_text(json.dumps({"type": "connection_established", "message": "Connected to Synapse telemetry"}))
+        while True:
+            # Keep connection open, client can send messages if needed
+            data = await websocket.receive_text()
+            # Echo or process client messages
+            await websocket.send_text(json.dumps({"type": "echo", "data": data}))
+    except WebSocketDisconnect:
+        manager.disconnect(websocket)
+    except Exception:
+        manager.disconnect(websocket)
+
+# Start background simulation telemetry when FastAPI starts
+@app.on_event("startup")
+async def startup_event():
+    asyncio.create_task(stream_live_ops_updates())
