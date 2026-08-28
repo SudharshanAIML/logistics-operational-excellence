@@ -58,8 +58,8 @@ export const KpiCard: React.FC<KpiCardProps> = ({
   return (
     <div className="flex flex-col justify-between h-[120px] bg-canvas border border-borderClean rounded-card p-4">
       {/* Header Row */}
-      <div className="flex justify-between items-start">
-        <span className="font-display text-[11px] font-semibold uppercase tracking-widest text-textMuted leading-none">
+      <div className="flex justify-between items-start gap-2">
+        <span className="font-display text-xs font-bold uppercase tracking-wider text-brand-brown leading-tight">
           {label}
         </span>
         {renderDelta()}
@@ -67,11 +67,11 @@ export const KpiCard: React.FC<KpiCardProps> = ({
       
       {/* Metric Value Row */}
       <div className="flex items-baseline mb-1">
-        <span className="tabular-nums font-mono text-3xl font-semibold tracking-tight text-brand-brown">
+        <span className="tabular-nums font-mono text-3xl font-bold tracking-tight text-brand-brown">
           {value}
         </span>
         {unit && (
-          <span className="ml-1 text-xs font-semibold text-textMuted font-display uppercase tracking-wider">
+          <span className="ml-1 text-xs font-bold text-brand-brown/80 font-mono uppercase tracking-wider">
             {unit}
           </span>
         )}

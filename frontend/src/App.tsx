@@ -249,7 +249,7 @@ const MainContent: React.FC = () => {
           </div>
 
           {/* Navigation Links */}
-          <nav className="flex-1 space-y-1 px-2">
+          <nav className="flex-1 space-y-1.5 px-3">
             {navItems.map((item) => {
               const isActive = activeTab === item.id;
               return (
@@ -258,11 +258,13 @@ const MainContent: React.FC = () => {
                   onClick={() => setActiveTab(item.id)}
                   className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-btn cursor-pointer transition-all font-display text-xs font-bold uppercase tracking-wider border-l-4 ${
                     isActive 
-                      ? 'bg-primary text-brand-gold border-brand-gold font-semibold shadow-inner' 
-                      : 'text-on-surface-variant border-transparent hover:bg-primary/50 hover:text-brand-gold'
+                      ? 'bg-primary text-brand-gold border-brand-gold font-bold shadow-inner' 
+                      : 'text-[#E8DCD5] border-transparent hover:bg-primary/70 hover:text-brand-gold'
                   }`}
                 >
-                  {item.icon}
+                  <span className={isActive ? 'text-brand-gold' : 'text-brand-gold/80'}>
+                    {item.icon}
+                  </span>
                   <span>{item.label}</span>
                 </button>
               );
@@ -272,15 +274,15 @@ const MainContent: React.FC = () => {
           {/* Sidebar Footer - Privacy & System Health */}
           <div className="mt-auto border-t border-outline/60 pt-3 px-4 space-y-2">
             {/* Privacy Floor Selector */}
-            <div className="flex items-center justify-between text-[11px] font-display uppercase tracking-wider text-on-primary-container">
+            <div className="flex items-center justify-between text-xs font-display font-bold uppercase tracking-wider text-[#E8DCD5]">
               <span className="flex items-center gap-1.5">
-                <ShieldCheck className="w-3.5 h-3.5 text-brand-green" />
+                <ShieldCheck className="w-4 h-4 text-brand-green" />
                 <span>Privacy Floor</span>
               </span>
               <select 
                 value={privacyFloor}
                 onChange={(e) => setPrivacyFloor(Number(e.target.value))}
-                className="bg-primary text-brand-gold font-mono text-[10px] px-1.5 py-0.5 rounded border border-outline outline-none cursor-pointer"
+                className="bg-primary text-brand-gold font-mono text-xs px-2 py-0.5 rounded border border-outline outline-none cursor-pointer font-bold"
               >
                 <option value={5}>k ≥ 5</option>
                 <option value={10}>k ≥ 10</option>
@@ -291,13 +293,13 @@ const MainContent: React.FC = () => {
             {/* System Health */}
             <button 
               onClick={() => setActiveTab('health')}
-              className="w-full flex items-center justify-between text-[11px] font-display uppercase tracking-wider text-on-primary-container hover:text-brand-gold transition-colors py-1"
+              className="w-full flex items-center justify-between text-xs font-display font-bold uppercase tracking-wider text-[#E8DCD5] hover:text-brand-gold transition-colors py-1"
             >
               <span className="flex items-center gap-1.5">
-                <Activity className="w-3.5 h-3.5 text-brand-gold" />
+                <Activity className="w-4 h-4 text-brand-gold" />
                 <span>System Health</span>
               </span>
-              <span className="w-2 h-2 rounded-full bg-brand-green"></span>
+              <span className="w-2.5 h-2.5 rounded-full bg-brand-green animate-pulse"></span>
             </button>
           </div>
         </aside>

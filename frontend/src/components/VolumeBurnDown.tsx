@@ -62,28 +62,28 @@ export const VolumeBurnDown: React.FC<VolumeBurnDownProps> = ({ data, title = "H
   };
 
   return (
-    <div className="bg-canvas border border-borderClean rounded-card p-5 h-[360px] flex flex-col justify-between">
+    <div className="bg-canvas border border-borderClean rounded-card p-5 h-[360px] flex flex-col justify-between shadow-sm">
       {/* Title & Custom Legend Header */}
       <div className="flex justify-between items-center mb-4">
-        <h3 className="font-display text-[15px] tracking-wide text-brand-brown">{title}</h3>
+        <h3 className="font-display text-sm font-bold uppercase tracking-wide text-brand-brown">{title}</h3>
         
         {/* Custom Legend */}
-        <div className="flex items-center gap-4 text-[10px] font-display font-semibold tracking-wider text-textMuted">
+        <div className="flex items-center gap-4 text-xs font-display font-bold tracking-wider text-brand-brown uppercase">
           <div className="flex items-center gap-1.5">
-            <span className="w-2.5 h-2.5 bg-brand-gold rounded-sm"></span>
+            <span className="w-3 h-3 bg-brand-gold rounded-sm inline-block"></span>
             <span>ACTUAL UNITS</span>
           </div>
           <div className="flex items-center gap-1.5">
-            <span className="w-2.5 h-0.5 bg-brand-brown rounded-sm inline-block"></span>
+            <span className="w-3 h-0.5 bg-brand-brown rounded-sm inline-block"></span>
             <span>EXPECTED (P50)</span>
           </div>
           <div className="flex items-center gap-1.5">
-            <span className="w-2.5 h-2.5 bg-brand-brown/10 rounded-sm"></span>
+            <span className="w-3 h-3 bg-brand-brown/15 border border-brand-brown/30 rounded-sm inline-block"></span>
             <span>CONFIDENCE BAND (P10-P90)</span>
           </div>
           {nowTimestamp && (
             <div className="flex items-center gap-1.5">
-              <span className="w-2.5 h-0.5 border-t border-dashed border-textMuted rounded-sm inline-block"></span>
+              <span className="w-3 h-0.5 border-t-2 border-dashed border-brand-brown inline-block"></span>
               <span>NOW LINE</span>
             </div>
           )}
@@ -102,13 +102,13 @@ export const VolumeBurnDown: React.FC<VolumeBurnDownProps> = ({ data, title = "H
             <XAxis 
               dataKey="timestamp" 
               tickFormatter={(ts) => ts.split(' ')[1] || ts} 
-              tick={{ fill: '#6B5D55', fontSize: 10, fontFamily: 'Barlow, sans-serif' }}
+              tick={{ fill: '#351C15', fontSize: 11, fontWeight: 600, fontFamily: 'IBM Plex Mono, monospace' }}
               axisLine={false}
               tickLine={false}
               dy={8}
             />
             <YAxis 
-              tick={{ fill: '#6B5D55', fontSize: 10, fontFamily: 'IBM Plex Mono, monospace' }}
+              tick={{ fill: '#351C15', fontSize: 11, fontWeight: 600, fontFamily: 'IBM Plex Mono, monospace' }}
               axisLine={false}
               tickLine={false}
               dx={-8}
@@ -120,7 +120,7 @@ export const VolumeBurnDown: React.FC<VolumeBurnDownProps> = ({ data, title = "H
               type="monotone" 
               dataKey="p90" 
               dataKey2="p10" // Custom Recharts area range properties
-              fill="rgba(53, 28, 21, 0.10)" 
+              fill="rgba(53, 28, 21, 0.12)" 
               stroke="none" 
               connectNulls 
             />
@@ -138,7 +138,7 @@ export const VolumeBurnDown: React.FC<VolumeBurnDownProps> = ({ data, title = "H
               type="monotone" 
               dataKey="p50" 
               stroke="#351C15" 
-              strokeWidth={2} 
+              strokeWidth={2.5} 
               dot={false} 
               activeDot={{ r: 4, stroke: '#351C15', strokeWidth: 1 }} 
             />
@@ -148,8 +148,8 @@ export const VolumeBurnDown: React.FC<VolumeBurnDownProps> = ({ data, title = "H
               type="monotone" 
               dataKey="actual" 
               stroke="#FFB500" 
-              strokeWidth={3} 
-              dot={false}
+              strokeWidth={3.5} 
+              dot={{ r: 3, fill: '#FFB500', stroke: '#351C15', strokeWidth: 1 }}
               activeDot={{ r: 6, fill: '#FFB500', stroke: '#351C15', strokeWidth: 2 }} 
             />
             
@@ -157,9 +157,9 @@ export const VolumeBurnDown: React.FC<VolumeBurnDownProps> = ({ data, title = "H
             {nowTimestamp && (
               <ReferenceLine 
                 x={nowTimestamp} 
-                stroke="#6B5D55" 
-                strokeWidth={1.5}
-                strokeDasharray="5 5" 
+                stroke="#351C15" 
+                strokeWidth={2}
+                strokeDasharray="4 4" 
               />
             )}
           </ComposedChart>

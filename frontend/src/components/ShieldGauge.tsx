@@ -18,9 +18,9 @@ export const ShieldGauge: React.FC<ShieldGaugeProps> = ({ score, delta }) => {
   const isPositive = delta >= 0;
 
   return (
-    <div className="flex flex-col items-center justify-center p-6 bg-canvas border border-borderClean rounded-card text-center min-h-[220px]">
-      <span className="font-display text-xs font-semibold uppercase tracking-widest text-textMuted mb-2">
-        Ops Efficiency Index (OEI)
+    <div className="flex flex-col items-center justify-center p-6 bg-canvas border border-borderClean rounded-card text-center min-h-[220px] shadow-sm">
+      <span className="font-display text-xs font-bold uppercase tracking-wider text-brand-brown mb-2">
+        OPS EFFICIENCY INDEX (OEI)
       </span>
       
       <div className="relative w-36 h-36">
@@ -67,7 +67,7 @@ export const ShieldGauge: React.FC<ShieldGaugeProps> = ({ score, delta }) => {
             y="56" 
             textAnchor="middle" 
             fill="#351C15" 
-            fontWeight="600" 
+            fontWeight="bold" 
             fontSize="21" 
             fontFamily="'IBM Plex Mono', monospace"
             className="select-none"
@@ -78,15 +78,15 @@ export const ShieldGauge: React.FC<ShieldGaugeProps> = ({ score, delta }) => {
       </div>
       
       {/* Delta Badge */}
-      <div className="flex items-center mt-3 text-xs font-semibold">
+      <div className="flex items-center mt-3 text-xs font-bold">
         <span className={`flex items-center tabular-nums px-2 py-0.5 rounded-badge ${
           isPositive 
-            ? 'bg-brand-green/10 text-brand-green' 
-            : 'bg-status-risk/10 text-status-risk'
+            ? 'bg-brand-green/15 text-brand-green border border-brand-green/30' 
+            : 'bg-status-risk/15 text-status-risk border border-status-risk/30'
         }`}>
           {isPositive ? '▲' : '▼'} {Math.abs(delta).toFixed(2)}
         </span>
-        <span className="text-textMuted ml-1.5 font-display text-[10px] tracking-wider uppercase">
+        <span className="text-brand-brown/80 ml-1.5 font-display text-xs tracking-wider uppercase font-semibold">
           vs last week
         </span>
       </div>

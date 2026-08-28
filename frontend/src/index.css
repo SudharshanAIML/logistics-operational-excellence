@@ -2,20 +2,21 @@
 @config "../tailwind.config.js";
 
 body {
-  background-color: #fff8f6;
-  color: #1F1512;
-  font-family: Barlow, sans-serif;
+  background-color: #FAF7F4;
+  color: #1C0F0B;
+  font-family: 'Plus Jakarta Sans', Inter, sans-serif;
   font-size: 14px;
-  line-height: 22px;
+  line-height: 1.5;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 h1, h2, h3, h4, h5, h6 {
-  font-family: 'Barlow Condensed', sans-serif;
-  font-weight: 600;
+  font-family: 'Barlow Condensed', 'Plus Jakarta Sans', sans-serif;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.025em;
-  color: #351C15;
+  letter-spacing: 0.03em;
+  color: #2A1610;
 }
 
 .tabular-nums {
