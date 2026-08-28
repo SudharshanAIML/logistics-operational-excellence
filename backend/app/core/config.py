@@ -1,4 +1,8 @@
 import os
+from pathlib import Path
+from dotenv import load_dotenv
+
+load_dotenv(Path(__file__).resolve().parents[2] / ".env")
 
 class Settings:
     DATABASE_URL: str = os.getenv("DATABASE_URL", "sqlite:///backend/app/db/hub_operations.db")
