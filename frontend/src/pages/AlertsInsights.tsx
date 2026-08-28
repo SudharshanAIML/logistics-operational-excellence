@@ -1,16 +1,55 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import ReactMarkdown from 'react-markdown';
 import { useApp } from '../store/AppContext';
-import { AlertCircle, MessageSquare, Send, FileText, AlertTriangle } from 'lucide-react';
+import { AlertCircle, Bot, Send, FileText, AlertTriangle, Sparkles, User } from 'lucide-react';
 import { API_BASE_URL } from '../config';
+
+const SourceBadge: React.FC<{ source: string }> = ({ source }) => (
+  source === 'gemini' ? (
+    <span className="flex items-center gap-1 font-eyebrow text-[9px] bg-brand-gold/15 text-brand-brown border border-brand-gold/30 px-1.5 py-0.5 rounded-badge uppercase font-bold tracking-widest shrink-0">
+      <Sparkles className="w-2.5 h-2.5" /> Gemini
+    </span>
+  ) : source === 'deterministic' ? (
+    <span className="font-eyebrow text-[9px] bg-surfaceAlt text-textMuted border border-borderClean px-1.5 py-0.5 rounded-badge uppercase font-bold tracking-widest shrink-0">
+      Deterministic
+    </span>
+  ) : null
+);
+
+const markdownComponents = {
+  p: (props: any) => <p className="mb-2 last:mb-0 leading-relaxed" {...props} />,
+  strong: (props: any) => <strong className="font-bold text-brand-brown" {...props} />,
+  em: (props: any) => <em className="italic" {...props} />,
+  ul: (props: any) => <ul className="list-disc pl-4 space-y-1 mb-2" {...props} />,
+  ol: (props: any) => <ol className="list-decimal pl-4 space-y-1 mb-2" {...props} />,
+  li: (props: any) => <li className="leading-relaxed" {...props} />,
+  h1: (props: any) => <h3 className="font-display text-sm font-bold text-brand-brown uppercase mt-3 mb-1.5 first:mt-0 tracking-wide" {...props} />,
+  h2: (props: any) => <h3 className="font-display text-sm font-bold text-brand-brown uppercase mt-3 mb-1.5 first:mt-0 tracking-wide" {...props} />,
+  h3: (props: any) => <h3 className="font-display text-sm font-bold text-brand-brown uppercase mt-3 mb-1.5 first:mt-0 tracking-wide" {...props} />,
+  code: (props: any) => <code className="font-mono text-[11px] bg-surfaceAlt px-1 py-0.5 rounded" {...props} />,
+};
+
+const MarkdownText: React.FC<{ text: string }> = ({ text }) => (
+  <ReactMarkdown components={markdownComponents}>{text}</ReactMarkdown>
+);
+
+interface ChatMessage {
+  id: string;
+  role: 'user' | 'assistant';
+  text: string;
+  source?: string;
+}
 
 export const AlertsInsights: React.FC = () => {
   const { selectedDate, alerts, alertsLoading } = useApp();
   const [query, setQuery] = useState('');
-  const [copilotResponse, setCopilotResponse] = useState<string>('');
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [copilotLoading, setCopilotLoading] = useState(false);
   const [narrativeSummary, setNarrativeSummary] = useState<string>('');
+  const [narrativeSource, setNarrativeSource] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const chatEndRef = useRef<HTMLDivElement>(null);
 
   // Fetch initial summary narrative
   useEffect(() => {
@@ -20,6 +59,7 @@ export const AlertsInsights: React.FC = () => {
       .then(res => res.ok ? res.json() : Promise.reject(new Error(`HTTP ${res.status}`)))
       .then(data => {
         setNarrativeSummary(data.response);
+        setNarrativeSource(data.source);
       })
       .catch(err => {
         console.error("Error fetching narrative summary:", err);
@@ -28,22 +68,33 @@ export const AlertsInsights: React.FC = () => {
       .finally(() => setLoading(false));
   }, [selectedDate]);
 
-  // Submit query to Copilot
+  // Auto-scroll the chat thread to the newest message
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages, copilotLoading]);
+
+  // Submit query to Copilot - appends to the thread instead of replacing a single answer box
   const handleAskCopilot = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!query.trim()) return;
+    if (!query.trim() || copilotLoading) return;
 
+    const userMessage: ChatMessage = { id: `u-${Date.now()}`, role: 'user', text: query };
+    setMessages(prev => [...prev, userMessage]);
     setCopilotLoading(true);
-    setCopilotResponse('');
+    const askedQuery = query;
+    setQuery('');
 
-    fetch(`${API_BASE_URL}/api/copilot/ask?query=${encodeURIComponent(query)}`)
+    fetch(`${API_BASE_URL}/api/copilot/ask?query=${encodeURIComponent(askedQuery)}`)
       .then(res => res.ok ? res.json() : Promise.reject(new Error(`HTTP ${res.status}`)))
       .then(data => {
-        setCopilotResponse(data.response);
+        setMessages(prev => [...prev, { id: `a-${Date.now()}`, role: 'assistant', text: data.response, source: data.source }]);
       })
       .catch(err => {
         console.error("Error questioning copilot:", err);
-        setCopilotResponse(`Error connecting to Synapse Copilot: ${err.message}. Please verify the backend is running.`);
+        setMessages(prev => [...prev, {
+          id: `a-${Date.now()}`, role: 'assistant',
+          text: `Unable to reach the Synapse Ops Copilot (${err.message}). Please verify the backend is running.`,
+        }]);
       })
       .finally(() => setCopilotLoading(false));
   };
@@ -93,8 +144,8 @@ export const AlertsInsights: React.FC = () => {
             ) : (
               alerts.map((a: any) => (
                 <div key={a.alert_id} className={`flex items-start gap-3 p-3 border rounded-card ${
-                  a.severity === 'risk' 
-                    ? 'bg-status-risk/5 border-status-risk/30' 
+                  a.severity === 'risk'
+                    ? 'bg-status-risk/5 border-status-risk/30'
                     : 'bg-brand-gold/5 border-brand-gold/30'
                 }`}>
                   <AlertCircle className={`w-5 h-5 mt-0.5 shrink-0 ${
@@ -121,61 +172,95 @@ export const AlertsInsights: React.FC = () => {
         <div className="lg:col-span-7 space-y-6">
           {/* Automated Daily Narrative Summary */}
           <div className="bg-canvas border border-borderClean rounded-card p-5">
-            <div className="flex items-center gap-2 mb-3 text-brand-brown border-b border-borderClean pb-2">
-              <FileText className="w-5 h-5" />
-              <h3 className="font-display text-[15px] tracking-wide font-bold uppercase">Auto-Generated Shift Narrative</h3>
+            <div className="flex items-center justify-between gap-2 mb-3 text-brand-brown border-b border-borderClean pb-2">
+              <div className="flex items-center gap-2">
+                <FileText className="w-5 h-5" />
+                <h3 className="font-display text-[15px] tracking-wide font-bold uppercase">Auto-Generated Shift Narrative</h3>
+              </div>
+              <SourceBadge source={narrativeSource} />
             </div>
-            <div className="text-xs text-textMuted font-ui leading-relaxed space-y-2 prose max-w-none">
-              {narrativeSummary.split('\n\n').map((para, i) => (
-                <p key={i} className={para.startsWith('###') ? 'font-display text-sm font-bold text-brand-brown uppercase pt-2' : ''}>
-                  {para.startsWith('###') ? para.replace('###', '') : para}
-                </p>
-              ))}
+            <div className="text-xs text-textMuted font-ui">
+              <MarkdownText text={narrativeSummary} />
             </div>
           </div>
 
-          {/* Ops Copilot agent panel */}
-          <div className="bg-canvas border border-borderClean rounded-card p-5 space-y-4">
-            <div className="flex items-center gap-2 text-brand-brown">
-              <MessageSquare className="w-5 h-5" />
-              <h3 className="font-display text-[15px] tracking-wide font-bold uppercase">Synapse Ops Copilot</h3>
+          {/* Ops Copilot agent panel - a proper chat thread, not a single overwritten answer box */}
+          <div className="bg-canvas border border-borderClean rounded-card overflow-hidden shadow-sm flex flex-col">
+            <div className="flex items-center justify-between gap-2 px-5 py-3.5 border-b border-borderClean bg-surfaceAlt">
+              <div className="flex items-center gap-2 text-brand-brown">
+                <Bot className="w-5 h-5" />
+                <h3 className="font-display text-[15px] tracking-wide font-bold uppercase">Synapse Ops Copilot</h3>
+              </div>
+              <span className="font-eyebrow text-[9px] bg-brand-green/15 text-brand-green border border-brand-green/30 px-1.5 py-0.5 rounded-badge uppercase font-bold tracking-widest">
+                Online
+              </span>
             </div>
-            <p className="text-xs text-textMuted font-ui">
-              Query the semantic KPI database. Try: <em>"Why did cycle times spike last Tuesday?"</em> or <em>"Show OEI stats for unload."</em>
-            </p>
 
-            <form onSubmit={handleAskCopilot} className="relative">
+            {/* Chat thread - scrolls independently, newest message always visible at the bottom */}
+            <div className="h-[340px] overflow-y-auto px-5 py-4 space-y-4 bg-surface/40">
+              {messages.length === 0 ? (
+                <div className="h-full flex flex-col items-center justify-center text-center gap-2 px-6">
+                  <Bot className="w-8 h-8 text-brand-brown/30" />
+                  <p className="text-xs text-textMuted font-ui">
+                    Ask about shift performance, weather impacts, or roster gaps. Try{' '}
+                    <em>"Why did cycle times spike last Tuesday?"</em> or <em>"Show OEI stats for unload."</em>
+                  </p>
+                </div>
+              ) : (
+                messages.map((m) => (
+                  <div key={m.id} className={`flex gap-2.5 ${m.role === 'user' ? 'flex-row-reverse' : ''}`}>
+                    <div className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 ${
+                      m.role === 'user' ? 'bg-brand-brown text-brand-gold' : 'bg-brand-gold/15 text-brand-brown'
+                    }`}>
+                      {m.role === 'user' ? <User className="w-3.5 h-3.5" /> : <Bot className="w-3.5 h-3.5" />}
+                    </div>
+                    <div className={`max-w-[85%] rounded-card px-3.5 py-2.5 text-xs font-ui leading-relaxed ${
+                      m.role === 'user'
+                        ? 'bg-brand-brown text-textInverse'
+                        : 'bg-canvas border border-borderClean text-textMuted'
+                    }`}>
+                      {m.role === 'assistant' && m.source && (
+                        <div className="mb-1.5"><SourceBadge source={m.source} /></div>
+                      )}
+                      {m.role === 'assistant' ? <MarkdownText text={m.text} /> : <p>{m.text}</p>}
+                    </div>
+                  </div>
+                ))
+              )}
+
+              {copilotLoading && (
+                <div className="flex gap-2.5">
+                  <div className="w-7 h-7 rounded-full flex items-center justify-center shrink-0 bg-brand-gold/15 text-brand-brown">
+                    <Bot className="w-3.5 h-3.5" />
+                  </div>
+                  <div className="bg-canvas border border-borderClean rounded-card px-3.5 py-2.5 flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-brand-brown/40 animate-bounce [animation-delay:-0.3s]"></span>
+                    <span className="w-1.5 h-1.5 rounded-full bg-brand-brown/40 animate-bounce [animation-delay:-0.15s]"></span>
+                    <span className="w-1.5 h-1.5 rounded-full bg-brand-brown/40 animate-bounce"></span>
+                  </div>
+                </div>
+              )}
+              <div ref={chatEndRef} />
+            </div>
+
+            {/* Input - pinned below the scrolling thread, always visible */}
+            <form onSubmit={handleAskCopilot} className="relative border-t border-borderClean p-3 bg-canvas">
               <input
                 type="text"
                 placeholder="Ask about shift performance, weather impacts, or roster gaps..."
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                className="w-full bg-surface border border-borderClean text-xs px-4 py-3 pr-12 rounded-btn outline-none font-ui text-brand-brown focus:border-brand-gold focus:bg-canvas"
+                disabled={copilotLoading}
+                className="w-full bg-surface border border-borderClean text-xs px-4 py-3 pr-12 rounded-btn outline-none font-ui text-brand-brown focus:border-brand-gold focus:bg-canvas disabled:opacity-60"
               />
               <button
                 type="submit"
-                disabled={copilotLoading}
-                className="absolute right-2.5 top-2.5 text-brand-brown hover:text-brand-gold transition-all"
+                disabled={copilotLoading || !query.trim()}
+                className="absolute right-5 top-1/2 -translate-y-1/2 text-brand-brown hover:text-brand-gold transition-all disabled:opacity-30 disabled:hover:text-brand-brown"
               >
                 <Send className="w-5 h-5" />
               </button>
             </form>
-
-            {/* Answer Display */}
-            {(copilotLoading || copilotResponse) && (
-              <div className="border border-borderClean rounded-card p-4 bg-surfaceAlt min-h-[120px] max-h-[220px] overflow-y-auto">
-                <span className="font-display text-[10px] font-bold tracking-widest text-textMuted uppercase block mb-2">
-                  Copilot Narrative Output
-                </span>
-                {copilotLoading ? (
-                  <p className="text-xs text-textMuted font-ui italic">Analyzing telemetry patterns and weather logs...</p>
-                ) : (
-                  <div className="text-xs text-textMuted font-ui leading-relaxed space-y-2 whitespace-pre-line">
-                    {copilotResponse}
-                  </div>
-                )}
-              </div>
-            )}
           </div>
         </div>
       </div>

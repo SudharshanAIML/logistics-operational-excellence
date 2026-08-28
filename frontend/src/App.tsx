@@ -304,8 +304,10 @@ const MainContent: React.FC = () => {
           </div>
         </aside>
 
-        {/* Main Canvas Viewport */}
-        <main className="ml-0 md:ml-sidebar-width flex-1 p-6 md:p-8 max-w-max-content-width mx-auto w-full min-h-[calc(100vh-64px)] overflow-y-auto">
+        {/* Main Canvas Viewport - fills the space after the sidebar with no
+            centering cap, which used to split leftover space into two gaps
+            (one hidden behind the sidebar, one visible as dead space on the right) */}
+        <main className="ml-0 md:ml-sidebar-width flex-1 p-6 md:p-8 w-full min-h-[calc(100vh-64px)] overflow-y-auto">
           {renderActiveTab()}
         </main>
       </div>
