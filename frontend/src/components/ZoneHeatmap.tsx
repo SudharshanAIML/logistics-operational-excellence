@@ -3,8 +3,8 @@ import React from 'react';
 interface HeatmapCell {
   zone: string;
   process: string;
-  utilization: number;
-  state: 'idle' | 'ok' | 'watch' | 'risk';
+  utilization: number | null;
+  state: 'idle' | 'ok' | 'watch' | 'risk' | 'redacted';
   active_workers: number;
 }
 
@@ -42,6 +42,13 @@ export const ZoneHeatmap: React.FC<ZoneHeatmapProps> = ({ data }) => {
       badge: 'bg-status-risk text-white border border-status-risk font-bold',
       bar: 'bg-status-risk',
       label: 'CRITICAL (>95%)'
+    },
+    redacted: {
+      bg: 'bg-surfaceAlt',
+      border: 'border-borderClean',
+      badge: 'bg-surfaceAlt text-textMuted border border-borderClean',
+      bar: 'bg-textMuted/20',
+      label: 'REDACTED (below privacy floor)'
     }
   };
 
@@ -83,14 +90,14 @@ export const ZoneHeatmap: React.FC<ZoneHeatmapProps> = ({ data }) => {
                 </div>
 
                 <span className={`px-2 py-0.5 rounded-badge text-[9.5px] font-display uppercase tracking-wider shrink-0 ${style.badge}`}>
-                  {cell.state === 'risk' ? 'Critical' : cell.state === 'watch' ? 'Congested' : cell.state === 'ok' ? 'Nominal' : 'Idle'}
+                  {cell.state === 'risk' ? 'Critical' : cell.state === 'watch' ? 'Congested' : cell.state === 'ok' ? 'Nominal' : cell.state === 'redacted' ? 'Redacted' : 'Idle'}
                 </span>
               </div>
-              
+
               {/* Metrics Row: Percentage & Headcount */}
               <div className="flex items-baseline justify-between mt-1 mb-2">
                 <span className="tabular-nums font-mono text-2xl font-bold leading-none text-brand-brown">
-                  {cell.utilization}%
+                  {cell.utilization === null ? '—' : `${cell.utilization}%`}
                 </span>
                 <span className="font-mono text-[11px] font-semibold text-textMuted bg-canvas border border-borderClean px-2 py-0.5 rounded-badge">
                   {cell.active_workers} HC
@@ -99,9 +106,9 @@ export const ZoneHeatmap: React.FC<ZoneHeatmapProps> = ({ data }) => {
 
               {/* Capacity Progress Bar */}
               <div className="w-full h-1.5 bg-surfaceAlt rounded-full overflow-hidden border border-borderClean/50">
-                <div 
+                <div
                   className={`h-full rounded-full transition-all duration-500 ${style.bar}`}
-                  style={{ width: `${Math.min(100, cell.utilization)}%` }}
+                  style={{ width: cell.utilization === null ? '100%' : `${Math.min(100, cell.utilization)}%` }}
                 ></div>
               </div>
             </div>

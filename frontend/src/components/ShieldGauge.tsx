@@ -2,20 +2,20 @@ import React from 'react';
 
 interface ShieldGaugeProps {
   score: number; // OEI score from 0.0 to 1.0
-  delta: number; // Comparison delta, e.g. +0.04
+  delta: number | null; // Real week-over-week comparison, null if last week has no data
 }
 
 export const ShieldGauge: React.FC<ShieldGaugeProps> = ({ score, delta }) => {
   // Clamp score between 0 and 1
   const clampedScore = Math.max(0, Math.min(1, score));
   const fillPercentage = clampedScore * 100;
-  
+
   // Calculate y position for SVG rect (100 is top, 0 is bottom in standard, but SVG coordinate has 0 at top, 100 at bottom)
   // Height should be fillPercentage, and y should be 100 - fillPercentage.
   const rectHeight = fillPercentage;
   const rectY = 100 - fillPercentage;
 
-  const isPositive = delta >= 0;
+  const isPositive = delta !== null && delta >= 0;
 
   return (
     <div className="flex flex-col items-center justify-center p-6 bg-canvas border border-borderClean rounded-card text-center min-h-[220px] shadow-sm">
@@ -79,16 +79,24 @@ export const ShieldGauge: React.FC<ShieldGaugeProps> = ({ score, delta }) => {
       
       {/* Delta Badge */}
       <div className="flex items-center mt-3 text-xs font-bold">
-        <span className={`flex items-center tabular-nums px-2 py-0.5 rounded-badge ${
-          isPositive 
-            ? 'bg-brand-green/15 text-brand-green border border-brand-green/30' 
-            : 'bg-status-risk/15 text-status-risk border border-status-risk/30'
-        }`}>
-          {isPositive ? '▲' : '▼'} {Math.abs(delta).toFixed(2)}
-        </span>
-        <span className="text-brand-brown/80 ml-1.5 font-display text-xs tracking-wider uppercase font-semibold">
-          vs last week
-        </span>
+        {delta === null ? (
+          <span className="text-textMuted font-display text-xs tracking-wider uppercase">
+            No data for last week
+          </span>
+        ) : (
+          <>
+            <span className={`flex items-center tabular-nums px-2 py-0.5 rounded-badge ${
+              isPositive
+                ? 'bg-brand-green/15 text-brand-green border border-brand-green/30'
+                : 'bg-status-risk/15 text-status-risk border border-status-risk/30'
+            }`}>
+              {isPositive ? '▲' : '▼'} {Math.abs(delta).toFixed(2)}
+            </span>
+            <span className="text-brand-brown/80 ml-1.5 font-display text-xs tracking-wider uppercase font-semibold">
+              vs last week
+            </span>
+          </>
+        )}
       </div>
     </div>
   );

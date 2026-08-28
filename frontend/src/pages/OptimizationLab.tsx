@@ -1,28 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { CheckCircle2, Sliders, RefreshCw, Zap, TrendingUp, Download, ArrowRight, Minus, Plus, Target } from 'lucide-react';
-
-const FALLBACK_SIMULATION = {
-  status: "success",
-  engine_status: "Deterministic MIP Solved",
-  metrics: {
-    projected_oei: 0.941,
-    oei_delta: 0.017,
-    average_dock_to_stock_min: 35.0,
-    cycle_time_delta_min: -30.0,
-    peak_backlog_items: 462,
-    backlog_delta_items: 12,
-    sla_breach_probability: 0.03,
-    baseline_cost: 42500,
-    simulated_cost: 43850,
-    cost_delta: 1350
-  }
-};
-
-const FALLBACK_TELEMETRY = [
-  { cell: "Sort A", baseHc: 45, rebalancedHc: 53, simLoad: 12400, effUph: 234, clearance: "02:30 AM", status: "Optimized" },
-  { cell: "Small Sort", baseHc: 30, rebalancedHc: 34, simLoad: 8900, effUph: 261, clearance: "03:00 AM", status: "Optimized" },
-  { cell: "Outbound Pack", baseHc: 60, rebalancedHc: 52, simLoad: 15200, effUph: 292, clearance: "03:15 AM", status: "Stable" },
-];
+import { CheckCircle2, Sliders, Download, ArrowRight, AlertTriangle } from 'lucide-react';
+import { API_BASE_URL } from '../config';
 
 export const OptimizationLab: React.FC = () => {
   const [surge, setSurge] = useState<number>(15);
@@ -30,23 +8,29 @@ export const OptimizationLab: React.FC = () => {
   const [variance, setVariance] = useState<number>(-5);
   const [objective, setObjective] = useState<string>('cost_variance');
   const [preset, setPreset] = useState<string>('normal');
-  const [simulation, setSimulation] = useState<any>(FALLBACK_SIMULATION);
-  const [telemetry, setTelemetry] = useState<any[]>(FALLBACK_TELEMETRY);
+  const [simulation, setSimulation] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [headcountOverrides, setHeadcountOverrides] = useState<Record<string, number>>({});
   const [appliedPlan, setAppliedPlan] = useState(false);
 
-  // Fetch simulation data when sliders change with fallback
+  // Fetch real simulation data when sliders change - no fallback constants
   useEffect(() => {
-    fetch(`http://localhost:8000/api/optimization/simulate?surge_pct=${surge}&absenteeism_pct=${absenteeism}`)
-      .then(res => res.ok ? res.json() : null)
+    setLoading(true);
+    setError(null);
+    fetch(`${API_BASE_URL}/api/optimization/simulate?surge_pct=${surge}&absenteeism_pct=${absenteeism}&variance_pct=${variance}`)
+      .then(res => res.ok ? res.json() : Promise.reject(new Error(`HTTP ${res.status}`)))
       .then(data => {
-        if (data && data.metrics) {
-          setSimulation(data);
-        }
+        setSimulation(data);
+        setAppliedPlan(false);
       })
-      .catch(() => {});
+      .catch(err => {
+        console.error("Error running simulation:", err);
+        setError("Could not reach the Synapse Ops API. Confirm the backend is running.");
+      })
+      .finally(() => setLoading(false));
   }, [surge, absenteeism, variance]);
 
-  // Presets mapping
   const applyPreset = (presetName: string, surgeVal: number, absentVal: number, varVal: number) => {
     setPreset(presetName);
     setSurge(surgeVal);
@@ -54,24 +38,24 @@ export const OptimizationLab: React.FC = () => {
     setVariance(varVal);
   };
 
-  const handleAdjustHc = (cellIndex: number, delta: number) => {
-    setTelemetry(prev => prev.map((t, idx) => {
-      if (idx === cellIndex) {
-        return { ...t, rebalancedHc: Math.max(1, t.rebalancedHc + delta) };
-      }
-      return t;
+  const handleAdjustHc = (process: string, base: number, delta: number) => {
+    setHeadcountOverrides(prev => ({
+      ...prev,
+      [process]: Math.max(1, (prev[process] ?? base) + delta),
     }));
   };
 
   const handleApplyPlan = () => {
     setAppliedPlan(true);
-    alert("Optimization plan applied: Shift directives dispatched to hub floor supervisors.");
   };
 
   const handleExportCSV = () => {
+    if (!simulation) return;
     const csvRows = [
-      ["Work Cell", "Base HC", "Rebalanced HC", "Simulated Load", "Eff UPH", "Proj Clearance", "Status"],
-      ...telemetry.map(t => [t.cell, t.baseHc, t.rebalancedHc, t.simLoad, t.effUph, t.clearance, t.status])
+      ["Work Cell", "Base HC", "Rebalanced HC", "Standard UPH"],
+      ...simulation.per_process.map((p: any) => [
+        p.process, p.base_headcount, headcountOverrides[p.process] ?? p.actual_headcount, p.standard_uph
+      ])
     ];
     const csvContent = "data:text/csv;charset=utf-8," + csvRows.map(e => e.join(",")).join("\n");
     const encodedUri = encodeURI(csvContent);
@@ -83,7 +67,31 @@ export const OptimizationLab: React.FC = () => {
     document.body.removeChild(link);
   };
 
-  const m = simulation.metrics || FALLBACK_SIMULATION.metrics;
+  if (loading && !simulation) {
+    return (
+      <div className="flex items-center justify-center h-[500px] text-textMuted font-display uppercase tracking-widest text-xs">
+        Running Digital Twin Simulation...
+      </div>
+    );
+  }
+
+  if (error || !simulation) {
+    return (
+      <div className="flex flex-col items-center justify-center h-[500px] gap-3 text-center">
+        <AlertTriangle className="w-8 h-8 text-status-risk" />
+        <p className="text-sm text-brand-brown font-ui font-semibold">{error || "No simulation data available."}</p>
+      </div>
+    );
+  }
+
+  const m = simulation.metrics;
+
+  // Real, data-driven coverage-gap directives: processes where absenteeism
+  // dropped actual headcount below the base staffing plan, sorted by size of gap
+  const coverageGaps = simulation.per_process
+    .map((p: any) => ({ ...p, gap: p.base_headcount - p.actual_headcount }))
+    .filter((p: any) => p.gap > 0)
+    .sort((a: any, b: any) => b.gap - a.gap);
 
   return (
     <div className="space-y-6">
@@ -93,13 +101,13 @@ export const OptimizationLab: React.FC = () => {
           <CheckCircle2 className="w-5 h-5 text-brand-green shrink-0" />
           <span className="font-eyebrow text-xs uppercase font-bold tracking-widest text-textMuted">Engine Status:</span>
           <span className="font-display text-lg font-bold text-brand-green uppercase tracking-wide">
-            DETERMINISTIC MIP SOLVED
+            SIMPY DIGITAL TWIN {loading ? '(RE-SIMULATING...)' : 'SOLVED'}
           </span>
         </div>
 
         <div className="flex items-center gap-2">
           <label className="font-eyebrow text-xs uppercase font-bold tracking-widest text-textMuted">Objective:</label>
-          <select 
+          <select
             value={objective}
             onChange={(e) => setObjective(e.target.value)}
             className="bg-canvas border border-borderClean font-display text-xs font-bold uppercase tracking-wider text-brand-brown px-3 py-1.5 rounded-btn outline-none cursor-pointer focus:border-brand-gold shadow-sm"
@@ -128,7 +136,7 @@ export const OptimizationLab: React.FC = () => {
               OPERATIONAL PRESETS
             </span>
             <div className="grid grid-cols-2 gap-2 text-center">
-              <button 
+              <button
                 onClick={() => applyPreset('peak', 30, 6, 5)}
                 className={`border py-1.5 px-2 rounded-btn font-display text-[11px] font-bold uppercase tracking-wider transition-all ${
                   preset === 'peak' ? 'bg-brand-brown text-brand-gold border-brand-brown' : 'border-borderClean hover:bg-surfaceAlt text-brand-brown'
@@ -137,7 +145,7 @@ export const OptimizationLab: React.FC = () => {
                 Peak Surge
               </button>
 
-              <button 
+              <button
                 onClick={() => applyPreset('flu', 0, 15, -10)}
                 className={`border py-1.5 px-2 rounded-btn font-display text-[11px] font-bold uppercase tracking-wider transition-all ${
                   preset === 'flu' ? 'bg-brand-brown text-brand-gold border-brand-brown' : 'border-borderClean hover:bg-surfaceAlt text-brand-brown'
@@ -146,7 +154,7 @@ export const OptimizationLab: React.FC = () => {
                 Flu Outbreak
               </button>
 
-              <button 
+              <button
                 onClick={() => applyPreset('weather', -10, 8, -15)}
                 className={`border py-1.5 px-2 rounded-btn font-display text-[11px] font-bold uppercase tracking-wider transition-all ${
                   preset === 'weather' ? 'bg-brand-brown text-brand-gold border-brand-brown' : 'border-borderClean hover:bg-surfaceAlt text-brand-brown'
@@ -155,7 +163,7 @@ export const OptimizationLab: React.FC = () => {
                 Weather Delay
               </button>
 
-              <button 
+              <button
                 onClick={() => applyPreset('normal', 15, 8, -5)}
                 className={`border py-1.5 px-2 rounded-btn font-display text-[11px] font-bold uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 ${
                   preset === 'normal' ? 'bg-brand-gold text-brand-brown border-brand-gold' : 'border-borderClean hover:bg-surfaceAlt text-brand-brown'
@@ -169,7 +177,6 @@ export const OptimizationLab: React.FC = () => {
 
           {/* Sliders Block */}
           <div className="space-y-5 pt-2 border-t border-borderClean">
-            {/* Slider 1 */}
             <div className="space-y-1.5">
               <div className="flex justify-between items-center text-xs font-semibold">
                 <span className="font-ui text-brand-brown">Inbound Volume Shock</span>
@@ -177,10 +184,10 @@ export const OptimizationLab: React.FC = () => {
                   {surge > 0 ? `+${surge}` : surge}%
                 </span>
               </div>
-              <input 
-                type="range" 
-                min="-30" 
-                max="50" 
+              <input
+                type="range"
+                min="-30"
+                max="50"
                 value={surge}
                 onChange={(e) => { setPreset('custom'); setSurge(Number(e.target.value)); }}
                 className="w-full h-1.5 bg-brand-brown/20 rounded-lg appearance-none cursor-pointer accent-brand-gold"
@@ -191,7 +198,6 @@ export const OptimizationLab: React.FC = () => {
               </div>
             </div>
 
-            {/* Slider 2 */}
             <div className="space-y-1.5">
               <div className="flex justify-between items-center text-xs font-semibold">
                 <span className="font-ui text-brand-brown">Absenteeism</span>
@@ -199,10 +205,10 @@ export const OptimizationLab: React.FC = () => {
                   {absenteeism}%
                 </span>
               </div>
-              <input 
-                type="range" 
-                min="0" 
-                max="25" 
+              <input
+                type="range"
+                min="0"
+                max="25"
                 value={absenteeism}
                 onChange={(e) => { setPreset('custom'); setAbsenteeism(Number(e.target.value)); }}
                 className="w-full h-1.5 bg-brand-brown/20 rounded-lg appearance-none cursor-pointer accent-brand-gold"
@@ -213,7 +219,6 @@ export const OptimizationLab: React.FC = () => {
               </div>
             </div>
 
-            {/* Slider 3 */}
             <div className="space-y-1.5">
               <div className="flex justify-between items-center text-xs font-semibold">
                 <span className="font-ui text-brand-brown">Efficiency Variance</span>
@@ -221,10 +226,10 @@ export const OptimizationLab: React.FC = () => {
                   {variance > 0 ? `+${variance}` : variance}%
                 </span>
               </div>
-              <input 
-                type="range" 
-                min="-20" 
-                max="20" 
+              <input
+                type="range"
+                min="-20"
+                max="20"
                 value={variance}
                 onChange={(e) => { setPreset('custom'); setVariance(Number(e.target.value)); }}
                 className="w-full h-1.5 bg-brand-brown/20 rounded-lg appearance-none cursor-pointer accent-brand-gold"
@@ -239,7 +244,7 @@ export const OptimizationLab: React.FC = () => {
 
         {/* Right Rail (8 cols): Projected Shift Impact & Directives */}
         <div className="lg:col-span-8 flex flex-col justify-between space-y-6">
-          {/* Shift Impact Matrix */}
+          {/* Shift Impact Matrix - real baseline vs scenario from the simulator */}
           <div className="bg-canvas border border-borderClean rounded-card p-5 shadow-sm">
             <h2 className="font-display text-sm font-bold uppercase tracking-wide text-brand-brown border-b border-borderClean pb-3 mb-4">
               PROJECTED SHIFT IMPACT MATRIX
@@ -257,108 +262,112 @@ export const OptimizationLab: React.FC = () => {
                 </thead>
                 <tbody className="divide-y divide-borderClean font-mono tabular-nums">
                   <tr className="hover:bg-surface">
-                    <td className="py-2.5 px-3 font-ui font-semibold text-brand-brown">Headcount Required</td>
-                    <td className="py-2.5 px-3 text-right text-textMuted">450</td>
-                    <td className="py-2.5 px-3 text-right font-bold text-brand-brown">462</td>
-                    <td className="py-2.5 px-3 text-right font-bold text-status-risk">
-                      <span className="bg-status-risk text-white px-2 py-0.5 rounded-badge text-[10px] inline-block">+12</span>
+                    <td className="py-2.5 px-3 font-ui font-semibold text-brand-brown">Headcount (Active)</td>
+                    <td className="py-2.5 px-3 text-right text-textMuted">{m.baseline_headcount}</td>
+                    <td className="py-2.5 px-3 text-right font-bold text-brand-brown">{m.scenario_headcount}</td>
+                    <td className="py-2.5 px-3 text-right font-bold">
+                      <span className={`px-2 py-0.5 rounded-badge text-[10px] inline-block ${m.scenario_headcount >= m.baseline_headcount ? 'bg-brand-green/15 text-brand-green' : 'bg-status-risk text-white'}`}>
+                        {m.scenario_headcount - m.baseline_headcount >= 0 ? '+' : ''}{m.scenario_headcount - m.baseline_headcount}
+                      </span>
                     </td>
                   </tr>
 
                   <tr className="hover:bg-surface">
                     <td className="py-2.5 px-3 font-ui font-semibold text-brand-brown">OEI Score</td>
-                    <td className="py-2.5 px-3 text-right text-textMuted">92.4%</td>
-                    <td className="py-2.5 px-3 text-right font-bold text-brand-brown">94.1%</td>
-                    <td className="py-2.5 px-3 text-right font-bold text-brand-green">
-                      <span className="bg-brand-green/15 text-brand-green border border-brand-green/30 px-2 py-0.5 rounded-badge text-[10px] inline-block">+1.7%</span>
+                    <td className="py-2.5 px-3 text-right text-textMuted">{(m.baseline_oei * 100).toFixed(1)}%</td>
+                    <td className="py-2.5 px-3 text-right font-bold text-brand-brown">{(m.projected_oei * 100).toFixed(1)}%</td>
+                    <td className="py-2.5 px-3 text-right font-bold">
+                      <span className={`px-2 py-0.5 rounded-badge text-[10px] inline-block ${m.oei_delta >= 0 ? 'bg-brand-green/15 text-brand-green border border-brand-green/30' : 'bg-status-risk text-white'}`}>
+                        {m.oei_delta >= 0 ? '+' : ''}{(m.oei_delta * 100).toFixed(1)}%
+                      </span>
                     </td>
                   </tr>
 
                   <tr className="hover:bg-surface">
-                    <td className="py-2.5 px-3 font-ui font-semibold text-brand-brown">Clearance Time</td>
-                    <td className="py-2.5 px-3 text-right text-textMuted">03:45 AM</td>
-                    <td className="py-2.5 px-3 text-right font-bold text-brand-brown">03:15 AM</td>
-                    <td className="py-2.5 px-3 text-right font-bold text-brand-green">
-                      <span className="bg-brand-green/15 text-brand-green border border-brand-green/30 px-2 py-0.5 rounded-badge text-[10px] inline-block">-30m</span>
+                    <td className="py-2.5 px-3 font-ui font-semibold text-brand-brown">Avg Dock-to-Stock (min)</td>
+                    <td className="py-2.5 px-3 text-right text-textMuted">{m.baseline_dock_to_stock_min}</td>
+                    <td className="py-2.5 px-3 text-right font-bold text-brand-brown">{m.average_dock_to_stock_min}</td>
+                    <td className="py-2.5 px-3 text-right font-bold">
+                      <span className={`px-2 py-0.5 rounded-badge text-[10px] inline-block ${m.cycle_time_delta_min <= 0 ? 'bg-brand-green/15 text-brand-green border border-brand-green/30' : 'bg-status-risk text-white'}`}>
+                        {m.cycle_time_delta_min >= 0 ? '+' : ''}{m.cycle_time_delta_min}m
+                      </span>
                     </td>
                   </tr>
 
                   <tr className="hover:bg-surface">
                     <td className="py-2.5 px-3 font-ui font-semibold text-brand-brown">Est. Shift Cost</td>
-                    <td className="py-2.5 px-3 text-right text-textMuted">$42,500</td>
-                    <td className="py-2.5 px-3 text-right font-bold text-brand-brown">$43,850</td>
-                    <td className="py-2.5 px-3 text-right font-bold text-status-risk">
-                      <span className="bg-status-risk text-white px-2 py-0.5 rounded-badge text-[10px] inline-block">+$1,350</span>
+                    <td className="py-2.5 px-3 text-right text-textMuted">${m.baseline_cost.toLocaleString()}</td>
+                    <td className="py-2.5 px-3 text-right font-bold text-brand-brown">${m.simulated_cost.toLocaleString()}</td>
+                    <td className="py-2.5 px-3 text-right font-bold">
+                      <span className={`px-2 py-0.5 rounded-badge text-[10px] inline-block ${m.projected_cost_delta_usd <= 0 ? 'bg-brand-green/15 text-brand-green border border-brand-green/30' : 'bg-status-risk text-white'}`}>
+                        {m.projected_cost_delta_usd >= 0 ? '+' : ''}${m.projected_cost_delta_usd.toLocaleString()}
+                      </span>
                     </td>
+                  </tr>
+
+                  <tr className="hover:bg-surface">
+                    <td className="py-2.5 px-3 font-ui font-semibold text-brand-brown">SLA Breach Probability</td>
+                    <td className="py-2.5 px-3 text-right text-textMuted">—</td>
+                    <td className="py-2.5 px-3 text-right font-bold text-brand-brown">{(m.sla_breach_probability * 100).toFixed(0)}%</td>
+                    <td className="py-2.5 px-3 text-right text-textMuted">—</td>
                   </tr>
                 </tbody>
               </table>
             </div>
           </div>
 
-          {/* Actionable Directives Block */}
+          {/* Actionable Directives Block - real coverage gaps from absenteeism, not fixed examples */}
           <div className="bg-canvas border border-borderClean rounded-card p-5 shadow-sm space-y-4">
             <h2 className="font-display text-sm font-bold uppercase tracking-wide text-brand-brown border-b border-borderClean pb-3">
-              ACTIONABLE WORKFORCE REBALANCING DIRECTIVES
+              STAFFING COVERAGE GAPS (FROM SIMULATED ABSENTEEISM)
             </h2>
 
             <div className="space-y-3">
-              {/* Directive 1 */}
-              <div className="border border-borderClean rounded-card p-3 bg-surfaceAlt flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="bg-brand-gold text-brand-brown font-mono text-sm font-bold px-2.5 py-1 rounded-badge">
-                    8
+              {coverageGaps.length === 0 ? (
+                <p className="text-xs text-textMuted italic py-2">No coverage gaps under this scenario - all processes are at full base staffing.</p>
+              ) : (
+                coverageGaps.map((p: any) => (
+                  <div key={p.process} className="border border-borderClean rounded-card p-3 bg-surfaceAlt flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="bg-brand-gold text-brand-brown font-mono text-sm font-bold px-2.5 py-1 rounded-badge">
+                        -{p.gap}
+                      </div>
+                      <div className="flex items-center gap-2 font-ui text-xs font-semibold text-brand-brown uppercase">
+                        <span>{p.process}</span>
+                        <span className="text-textMuted font-mono normal-case">({p.actual_headcount}/{p.base_headcount} staffed)</span>
+                      </div>
+                    </div>
+                    <span className={`font-eyebrow text-[10px] px-2 py-0.5 rounded-badge uppercase font-bold tracking-widest border ${
+                      p.gap >= 2 ? 'bg-status-risk/15 text-status-risk border-status-risk/30' : 'bg-brand-gold/15 text-brand-brown border-brand-gold/30'
+                    }`}>
+                      {p.gap >= 2 ? 'High Impact' : 'Medium Impact'}
+                    </span>
                   </div>
-                  <div className="flex items-center gap-2 font-ui text-xs font-semibold text-brand-brown">
-                    <span>Outbound Pack</span>
-                    <ArrowRight className="w-4 h-4 text-textMuted" />
-                    <span>Sort A</span>
-                  </div>
-                </div>
-                <span className="font-eyebrow text-[10px] bg-brand-gold/15 text-brand-brown border border-brand-gold/30 px-2 py-0.5 rounded-badge uppercase font-bold tracking-widest">
-                  High Impact
-                </span>
-              </div>
-
-              {/* Directive 2 */}
-              <div className="border border-borderClean rounded-card p-3 bg-surfaceAlt flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="bg-brand-gold text-brand-brown font-mono text-sm font-bold px-2.5 py-1 rounded-badge">
-                    4
-                  </div>
-                  <div className="flex items-center gap-2 font-ui text-xs font-semibold text-brand-brown">
-                    <span>Unload Bay 2</span>
-                    <ArrowRight className="w-4 h-4 text-textMuted" />
-                    <span>Small Sort</span>
-                  </div>
-                </div>
-                <span className="font-eyebrow text-[10px] bg-surfaceAlt text-textMuted border border-borderClean px-2 py-0.5 rounded-badge uppercase font-bold tracking-widest">
-                  Medium Impact
-                </span>
-              </div>
+                ))
+              )}
             </div>
 
-            <button 
+            <button
               onClick={handleApplyPlan}
               className={`w-full font-display text-xs font-bold uppercase tracking-widest py-2.5 rounded-btn transition-all shadow-sm ${
-                appliedPlan 
-                  ? 'bg-brand-green/20 text-brand-green border border-brand-green/40' 
+                appliedPlan
+                  ? 'bg-brand-green/20 text-brand-green border border-brand-green/40'
                   : 'bg-brand-gold text-brand-brown hover:bg-brand-gold600'
               }`}
             >
-              {appliedPlan ? 'OPTIMIZATION PLAN APPLIED ✓' : 'APPLY OPTIMIZATION PLAN'}
+              {appliedPlan ? 'SCENARIO ACKNOWLEDGED ✓' : 'ACKNOWLEDGE SCENARIO'}
             </button>
           </div>
         </div>
       </div>
 
-      {/* Bottom Section (12 cols): Zone-by-Zone Telemetry */}
+      {/* Bottom Section (12 cols): Zone-by-Zone Telemetry - real per-process simulation output */}
       <div className="bg-canvas border border-borderClean rounded-card overflow-hidden shadow-sm">
         <div className="p-4 border-b border-borderClean bg-surfaceAlt flex justify-between items-center">
           <h2 className="font-display text-sm font-bold uppercase tracking-wide text-brand-brown">
-            ZONE-BY-ZONE REBALANCING TELEMETRY
+            ZONE-BY-ZONE HEADCOUNT TELEMETRY
           </h2>
-          <button 
+          <button
             onClick={handleExportCSV}
             className="flex items-center gap-1.5 text-brand-brown hover:text-brand-gold transition-colors font-display text-xs font-bold uppercase tracking-wider"
           >
@@ -368,56 +377,56 @@ export const OptimizationLab: React.FC = () => {
         </div>
 
         <div className="overflow-x-auto w-full">
-          <table className="w-full text-left border-collapse min-w-[750px]">
+          <table className="w-full text-left border-collapse min-w-[650px]">
             <thead>
               <tr className="bg-surface text-textMuted font-display text-[10px] font-bold uppercase tracking-wider border-b border-borderClean">
                 <th className="p-3">Work Cell</th>
                 <th className="p-3 text-right">Base HC</th>
-                <th className="p-3 text-center">Rebalanced HC</th>
-                <th className="p-3 text-right">Sim. Load (Vol)</th>
-                <th className="p-3 text-right">Eff. UPH</th>
-                <th className="p-3 text-right">Proj. Clearance</th>
+                <th className="p-3 text-center">Simulated HC (adjustable)</th>
+                <th className="p-3 text-right">Standard UPH</th>
                 <th className="p-3 text-center">Status</th>
               </tr>
             </thead>
             <tbody className="font-mono tabular-nums text-xs divide-y divide-borderClean">
-              {telemetry.map((r: any, idx: number) => (
-                <tr key={idx} className="hover:bg-surface transition-colors">
-                  <td className="p-3 font-ui font-semibold text-brand-brown">{r.cell}</td>
-                  <td className="p-3 text-right text-textMuted">{r.baseHc}</td>
-                  <td className="p-3 text-center">
-                    <div className="flex items-center justify-center gap-2">
-                      <button 
-                        onClick={() => handleAdjustHc(idx, -1)}
-                        className="w-6 h-6 border border-borderClean rounded flex items-center justify-center hover:bg-surfaceAlt transition-colors font-bold text-brand-brown"
-                      >
-                        -
-                      </button>
-                      <span className="bg-brand-gold text-brand-brown px-2.5 py-0.5 rounded font-bold font-mono">
-                        {r.rebalancedHc}
+              {simulation.per_process.map((p: any) => {
+                const displayedHc = headcountOverrides[p.process] ?? p.actual_headcount;
+                const isShort = displayedHc < p.base_headcount;
+                return (
+                  <tr key={p.process} className="hover:bg-surface transition-colors">
+                    <td className="p-3 font-ui font-semibold text-brand-brown uppercase">{p.process}</td>
+                    <td className="p-3 text-right text-textMuted">{p.base_headcount}</td>
+                    <td className="p-3 text-center">
+                      <div className="flex items-center justify-center gap-2">
+                        <button
+                          onClick={() => handleAdjustHc(p.process, p.actual_headcount, -1)}
+                          className="w-6 h-6 border border-borderClean rounded flex items-center justify-center hover:bg-surfaceAlt transition-colors font-bold text-brand-brown"
+                        >
+                          -
+                        </button>
+                        <span className="bg-brand-gold text-brand-brown px-2.5 py-0.5 rounded font-bold font-mono">
+                          {displayedHc}
+                        </span>
+                        <button
+                          onClick={() => handleAdjustHc(p.process, p.actual_headcount, 1)}
+                          className="w-6 h-6 border border-borderClean rounded flex items-center justify-center hover:bg-surfaceAlt transition-colors font-bold text-brand-brown"
+                        >
+                          +
+                        </button>
+                      </div>
+                    </td>
+                    <td className="p-3 text-right text-textMuted">{p.standard_uph}</td>
+                    <td className="p-3 text-center font-ui">
+                      <span className={`px-2.5 py-0.5 rounded-badge text-[10px] font-display font-bold uppercase tracking-wider select-none inline-block ${
+                        isShort
+                          ? 'bg-status-risk/15 text-status-risk border border-status-risk/30'
+                          : 'bg-brand-green/15 text-brand-green border border-brand-green/30'
+                      }`}>
+                        {isShort ? 'Short-staffed' : 'At/Above Base'}
                       </span>
-                      <button 
-                        onClick={() => handleAdjustHc(idx, 1)}
-                        className="w-6 h-6 border border-borderClean rounded flex items-center justify-center hover:bg-surfaceAlt transition-colors font-bold text-brand-brown"
-                      >
-                        +
-                      </button>
-                    </div>
-                  </td>
-                  <td className="p-3 text-right text-brand-brown font-semibold">{r.simLoad.toLocaleString()}</td>
-                  <td className="p-3 text-right text-textMuted">{r.effUph}</td>
-                  <td className="p-3 text-right font-semibold text-brand-brown">{r.clearance}</td>
-                  <td className="p-3 text-center font-ui">
-                    <span className={`px-2.5 py-0.5 rounded-badge text-[10px] font-display font-bold uppercase tracking-wider select-none inline-block ${
-                      r.status === 'Optimized' 
-                        ? 'bg-brand-green/15 text-brand-green border border-brand-green/30' 
-                        : 'bg-surfaceAlt text-textMuted border border-borderClean'
-                    }`}>
-                      {r.status}
-                    </span>
-                  </td>
-                </tr>
-              ))}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -425,4 +434,3 @@ export const OptimizationLab: React.FC = () => {
     </div>
   );
 };
-

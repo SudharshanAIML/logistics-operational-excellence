@@ -1,9 +1,11 @@
 import asyncio
 import json
-import random
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import func
 from backend.app.api.router import api_router
+from backend.app.db.database import SessionLocal
+from backend.app.db.models import ScanEvent
 
 app = FastAPI(
     title="Synapse Ops API",
@@ -49,24 +51,40 @@ class ConnectionManager:
 
 manager = ConnectionManager()
 
-# Background task to stream live mock metrics over WebSocket
+def _fetch_live_metrics() -> dict:
+    """
+    Reads the most recent real scan_events per process to build the live telemetry
+    snapshot, instead of the previous random.uniform() placeholder values.
+    """
+    from backend.app.db.models import Alert
+
+    db = SessionLocal()
+    try:
+        metrics = {}
+        for process in ["unload", "sort", "stow", "pick", "pack", "load"]:
+            # Average over the 200 most recent real scan events for this process
+            # (ORDER BY + LIMIT must happen in a subquery before the aggregate)
+            recent = db.query(ScanEvent.actual_uph).filter(
+                ScanEvent.process == process
+            ).order_by(ScanEvent.timestamp.desc()).limit(200).subquery()
+            avg_uph = db.query(func.avg(recent.c.actual_uph)).scalar()
+            metrics[f"{process}_uph"] = round(float(avg_uph), 1) if avg_uph is not None else 0.0
+
+        metrics["active_alerts_count"] = db.query(Alert).filter(Alert.status == "active").count()
+        return metrics
+    finally:
+        db.close()
+
+# Background task streaming real, DB-derived telemetry over WebSocket
 async def stream_live_ops_updates():
     while True:
         await asyncio.sleep(5.0) # Send updates every 5 seconds
         if manager.active_connections:
-            # Generate subtle fluctuations in UPH and volumes to make UI look alive
+            metrics = await asyncio.to_thread(_fetch_live_metrics)
             live_data = {
                 "type": "live_telemetry",
                 "timestamp": asyncio.get_event_loop().time(),
-                "metrics": {
-                    "unload_uph": round(random.uniform(135.0, 148.0), 1),
-                    "sort_uph": round(random.uniform(310.0, 335.0), 1),
-                    "stow_uph": round(random.uniform(105.0, 116.0), 1),
-                    "pick_uph": round(random.uniform(175.0, 185.0), 1),
-                    "pack_uph": round(random.uniform(146.0, 154.0), 1),
-                    "load_uph": round(random.uniform(195.0, 205.0), 1),
-                    "active_alerts_count": random.choice([2, 3, 4])
-                }
+                "metrics": metrics
             }
             await manager.broadcast(json.dumps(live_data))
 

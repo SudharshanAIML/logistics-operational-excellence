@@ -2,51 +2,73 @@ import React, { useState, useEffect } from 'react';
 import { useApp } from '../store/AppContext';
 import { RosterGantt } from '../components/RosterGantt';
 import { Clock, Users, AlertTriangle, RefreshCw, ArrowRight, ArrowLeftRight, CheckCircle2, Play, Coffee, ShieldAlert, Check } from 'lucide-react';
+import { API_BASE_URL } from '../config';
 
-const FALLBACK_GAP_DATA = {
-  total: {
-    forecast_volume: 107200,
-    required_hours: 251.0,
-    required_headcount: 26,
-    available_headcount: 24,
-    gap: -2,
-    utilization_pct: 108
-  },
-  processes: [
-    { label: "Unload", forecast_volume: 12500, standard_uph: 450, required_hours: 27.8, required_headcount: 4, available_headcount: 5, gap: 1, utilization_pct: 80, isShortfall: false },
-    { label: "Sort", forecast_volume: 35000, standard_uph: 800, required_hours: 43.8, required_headcount: 12, available_headcount: 10, gap: -2, utilization_pct: 120, isShortfall: true },
-    { label: "Stow", forecast_volume: 18200, standard_uph: 350, required_hours: 52.0, required_headcount: 4, available_headcount: 4, gap: 0, utilization_pct: 100, isShortfall: false },
-    { label: "Pick", forecast_volume: 22000, standard_uph: 280, required_hours: 78.6, required_headcount: 4, available_headcount: 3, gap: -1, utilization_pct: 133, isShortfall: true },
-    { label: "Pack", forecast_volume: 19500, standard_uph: 400, required_hours: 48.8, required_headcount: 2, available_headcount: 2, gap: 0, utilization_pct: 100, isShortfall: false },
-  ]
-};
+// The API returns required/available headcounts and a gap, but not a
+// pre-computed utilization_pct/isShortfall - derive those display-only
+// fields from the real numbers rather than expecting the backend to fabricate them.
+function withDerivedFields(row: any) {
+  return {
+    ...row,
+    utilization_pct: row.available_headcount > 0
+      ? Math.round((row.required_headcount / row.available_headcount) * 100)
+      : 0,
+    isShortfall: row.gap < 0,
+  };
+}
 
-const FALLBACK_GANTT_TASKS = [
-  { id: '1', workerId: 'W-4492', workerName: 'Marcus Vance', process: 'unload', zone: 'Bay 4', shift: 'Day', startHour: 6, endHour: 14 },
-  { id: '2', workerId: 'W-8810', workerName: 'Sarah Jenkins', process: 'sort', zone: 'Sort A', shift: 'Day', startHour: 6, endHour: 14 },
-  { id: '3', workerId: 'W-1042', workerName: 'David Ross', process: 'sort', zone: 'Sort A', shift: 'Day', startHour: 6, endHour: 14 },
-  { id: '4', workerId: 'W-3301', workerName: 'Elena Rostova', process: 'stow', zone: 'Zone C', shift: 'Day', startHour: 6, endHour: 14 },
-  { id: '5', workerId: 'W-5592', workerName: 'James Chen', process: 'pick', zone: 'Zone 3', shift: 'Day', startHour: 6, endHour: 14 },
-  { id: '6', workerId: 'W-9120', workerName: 'Anita Patel', process: 'pack', zone: 'Outbound', shift: 'Day', startHour: 6, endHour: 14 },
-];
+// Real, data-driven redistribution suggestions: greedily pair the process
+// with the largest surplus against the process with the largest shortfall,
+// computed from the actual gap numbers rather than fixed made-up examples.
+function computeDispatchDirectives(processes: any[]) {
+  const surplus = processes.filter(p => p.gap > 0).sort((a, b) => b.gap - a.gap);
+  const deficit = processes.filter(p => p.gap < 0).sort((a, b) => a.gap - b.gap);
+  const directives = [];
+  let i = 0, j = 0;
+  while (i < surplus.length && j < deficit.length) {
+    const move = Math.min(surplus[i].gap, -deficit[j].gap);
+    directives.push({
+      id: `dir-${surplus[i].process}-${deficit[j].process}`,
+      count: move,
+      from: surplus[i].label,
+      to: deficit[j].label,
+      reason: `Relieves ${deficit[j].label} shortfall using ${surplus[i].label}'s surplus headcount.`,
+    });
+    surplus[i].gap -= move;
+    deficit[j].gap += move;
+    if (surplus[i].gap === 0) i++;
+    if (deficit[j].gap === 0) j++;
+  }
+  return directives;
+}
 
 export const WorkforcePlanner: React.FC = () => {
   const { selectedDate, selectedShift } = useApp();
-  const [gapData, setGapData] = useState<any>(FALLBACK_GAP_DATA);
-  const [ganttTasks, setGanttTasks] = useState<any[]>(FALLBACK_GANTT_TASKS);
+  const [gapData, setGapData] = useState<any>(null);
+  const [ganttTasks, setGanttTasks] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [optimizing, setOptimizing] = useState(false);
   const [executedDirectives, setExecutedDirectives] = useState<Record<string, boolean>>({});
 
-  // Fetch workforce gaps with fallback
+  // Fetch real workforce gaps - no fallback constants
   useEffect(() => {
-    fetch(`http://localhost:8000/api/workforce/gaps?date=${selectedDate}`)
-      .then(res => res.ok ? res.json() : null)
+    setLoading(true);
+    setError(null);
+    fetch(`${API_BASE_URL}/api/workforce/gaps?date=${selectedDate}`)
+      .then(res => res.ok ? res.json() : Promise.reject(new Error(`HTTP ${res.status}`)))
       .then(data => {
-        if (data && data.processes?.length) {
-          setGapData(data);
-        }
+        setGapData({
+          ...data,
+          total: withDerivedFields(data.total),
+          processes: data.processes.map(withDerivedFields),
+        });
       })
-      .catch(() => {});
+      .catch(err => {
+        console.error("Error loading workforce gaps:", err);
+        setError("Could not reach the Synapse Ops API. Confirm the backend is running.");
+      })
+      .finally(() => setLoading(false));
   }, [selectedDate]);
 
   // Run CP-SAT optimizer
@@ -57,21 +79,21 @@ export const WorkforcePlanner: React.FC = () => {
       "Twilight": {"unload": 6, "sort": 7, "stow": 6, "pick": 6, "pack": 5, "load": 5},
       "Night": {"unload": 3, "sort": 4, "stow": 3, "pick": 4, "pack": 3, "load": 3}
     };
-    
-    fetch(`http://localhost:8000/api/workforce/optimize?date=${selectedDate}`, {
+
+    fetch(`${API_BASE_URL}/api/workforce/optimize?date=${selectedDate}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(defaultRequirements)
     })
-      .then(res => res.ok ? res.json() : null)
+      .then(res => res.ok ? res.json() : Promise.reject(new Error(`HTTP ${res.status}`)))
       .then(data => {
-        if (data && data.status === "success" && data.gantt_tasks?.length) {
-          setGanttTasks(data.gantt_tasks);
+        if (data.status === "success") {
+          setGanttTasks(data.gantt_tasks ?? []);
         } else {
-          alert("Optimized solver executed: CP-SAT shift assignments updated!");
+          alert(`Optimizer did not find a feasible roster: ${data.message ?? 'unknown reason'}`);
         }
       })
-      .catch(() => alert("Optimized CP-SAT solver executed (Simulated background worker)."))
+      .catch(err => alert(`Roster optimization failed: ${err.message}`))
       .finally(() => setOptimizing(false));
   };
 
@@ -80,19 +102,33 @@ export const WorkforcePlanner: React.FC = () => {
   };
 
   const handleAutoBalanceAll = () => {
-    setGapData((prev: any) => ({
-      ...prev,
-      total: { ...prev.total, gap: 0, utilization_pct: 100, available_headcount: 26 },
-      processes: prev.processes.map((p: any) => ({
-        ...p,
-        available_headcount: p.required_headcount,
-        gap: 0,
-        utilization_pct: 100,
-        isShortfall: false
-      }))
-    }));
-    alert("Auto-balance complete: Floor workers redistributed across active process nodes.");
+    // Rebalancing isn't a persisted backend action yet - rather than overwrite
+    // the real gap numbers on screen with a fabricated "fully balanced" result,
+    // point the user at the optimizer that actually recomputes a real roster.
+    alert("Auto-balance isn't wired to a live rebalancing action yet - use \"Generate Roster\" to run the real CP-SAT optimizer against current gaps.");
   };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-[500px] text-textMuted font-display uppercase tracking-widest text-xs">
+        Assembling Workforce Matrix...
+      </div>
+    );
+  }
+
+  if (error || !gapData) {
+    return (
+      <div className="flex flex-col items-center justify-center h-[500px] gap-3 text-center">
+        <AlertTriangle className="w-8 h-8 text-status-risk" />
+        <p className="text-sm text-brand-brown font-ui font-semibold">{error || "No workforce data available."}</p>
+      </div>
+    );
+  }
+
+  // Pass a deep copy - computeDispatchDirectives mutates gap values while pairing
+  const dispatchDirectives = computeDispatchDirectives(
+    gapData.processes.map((p: any) => ({ ...p }))
+  );
 
   return (
     <div className="space-y-6">
@@ -240,67 +276,39 @@ export const WorkforcePlanner: React.FC = () => {
                 <span>DISPATCH DIRECTIVES</span>
               </h3>
               <span className="font-eyebrow text-[10px] bg-brand-green/15 text-brand-green border border-brand-green/30 px-2 py-0.5 rounded-badge uppercase font-bold tracking-widest">
-                2 Active Directives
+                {dispatchDirectives.length} Active Directive{dispatchDirectives.length === 1 ? '' : 's'}
               </span>
             </div>
 
             <div className="space-y-3">
-              {/* Directive 1 */}
-              <div className="border border-borderClean border-l-4 border-l-brand-gold rounded-card p-3 bg-surfaceAlt flex justify-between items-start">
-                <div>
-                  <p className="font-ui text-xs font-bold text-brand-brown mb-0.5">Reassign Worker (ID: 4492 - Marcus Vance)</p>
-                  <p className="font-mono text-xs text-textMuted">
-                    Move from <strong className="text-brand-brown">Unload Dock B</strong> &rarr; <strong className="text-status-risk">Sort Line A</strong>
-                  </p>
-                  <p className="font-eyebrow text-[10px] uppercase tracking-wider text-brand-brown/80 mt-1">
-                    Algorithmic Recommendation: Relieves Sort bottleneck.
-                  </p>
-                </div>
-                <button 
-                  onClick={() => handleExecuteDirective('dir-1')}
-                  disabled={executedDirectives['dir-1']}
-                  className={`font-display text-[11px] font-bold uppercase tracking-wider px-3 py-1 rounded-btn transition-all ${
-                    executedDirectives['dir-1']
-                      ? 'bg-brand-green/20 text-brand-green border border-brand-green/40 cursor-default'
-                      : 'bg-brand-brown text-brand-gold hover:bg-brand-brown700'
-                  }`}
-                >
-                  {executedDirectives['dir-1'] ? 'Executed ✓' : 'Execute'}
-                </button>
-              </div>
-
-              {/* Directive 2 */}
-              <div className="border border-borderClean border-l-4 border-l-brand-gold rounded-card p-3 bg-surfaceAlt flex justify-between items-start">
-                <div>
-                  <p className="font-ui text-xs font-bold text-brand-brown mb-0.5">Deploy Flex Staff (ID: 8810 - Sarah Jenkins)</p>
-                  <p className="font-mono text-xs text-textMuted">
-                    Deploy to <strong className="text-status-risk">Pick Zone 3</strong>
-                  </p>
-                  <p className="font-eyebrow text-[10px] uppercase tracking-wider text-brand-brown/80 mt-1">
-                    Algorithmic Recommendation: Mitigates Pick shortfall.
-                  </p>
-                </div>
-                <button 
-                  onClick={() => handleExecuteDirective('dir-2')}
-                  disabled={executedDirectives['dir-2']}
-                  className={`font-display text-[11px] font-bold uppercase tracking-wider px-3 py-1 rounded-btn transition-all ${
-                    executedDirectives['dir-2']
-                      ? 'bg-brand-green/20 text-brand-green border border-brand-green/40 cursor-default'
-                      : 'bg-brand-brown text-brand-gold hover:bg-brand-brown700'
-                  }`}
-                >
-                  {executedDirectives['dir-2'] ? 'Executed ✓' : 'Execute'}
-                </button>
-              </div>
-
-              {/* Directive 3 (Completed) */}
-              <div className="border border-borderClean rounded-card p-3 bg-surface opacity-60 flex justify-between items-start">
-                <div>
-                  <p className="font-ui text-xs font-bold text-textMuted line-through mb-0.5">Pause Stow Operation C</p>
-                  <p className="font-mono text-xs text-textMuted">Redirect 2 workers to Pack.</p>
-                </div>
-                <span className="font-eyebrow text-[10px] text-textMuted uppercase">Executed 10m ago</span>
-              </div>
+              {dispatchDirectives.length === 0 ? (
+                <p className="text-xs text-textMuted italic py-4 text-center">No redistribution needed - all processes are within their required headcount.</p>
+              ) : (
+                dispatchDirectives.map((d) => (
+                  <div key={d.id} className="border border-borderClean border-l-4 border-l-brand-gold rounded-card p-3 bg-surfaceAlt flex justify-between items-start">
+                    <div>
+                      <p className="font-ui text-xs font-bold text-brand-brown mb-0.5">Reassign {d.count} worker{d.count === 1 ? '' : 's'}</p>
+                      <p className="font-mono text-xs text-textMuted">
+                        Move from <strong className="text-brand-brown">{d.from}</strong> &rarr; <strong className="text-status-risk">{d.to}</strong>
+                      </p>
+                      <p className="font-eyebrow text-[10px] uppercase tracking-wider text-brand-brown/80 mt-1">
+                        {d.reason}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => handleExecuteDirective(d.id)}
+                      disabled={executedDirectives[d.id]}
+                      className={`font-display text-[11px] font-bold uppercase tracking-wider px-3 py-1 rounded-btn transition-all shrink-0 ${
+                        executedDirectives[d.id]
+                          ? 'bg-brand-green/20 text-brand-green border border-brand-green/40 cursor-default'
+                          : 'bg-brand-brown text-brand-gold hover:bg-brand-brown700'
+                      }`}
+                    >
+                      {executedDirectives[d.id] ? 'Executed ✓' : 'Execute'}
+                    </button>
+                  </div>
+                ))
+              )}
             </div>
           </div>
         </section>
@@ -343,25 +351,31 @@ export const WorkforcePlanner: React.FC = () => {
                 </div>
               </div>
 
-              {/* Rows */}
+              {/* Rows - break block positions are illustrative (no break-schedule
+                  data exists in the schema), but the headcounts shown are real */}
               <div className="space-y-2 pt-1 font-ui text-xs">
+                {(() => {
+                  const byProcess = Object.fromEntries(gapData.processes.map((p: any) => [p.process, p]));
+                  const unload = byProcess['unload'], sort = byProcess['sort'], stow = byProcess['stow'];
+                  return (
+                    <>
                 <div className="flex items-center">
-                  <span className="w-1/4 font-semibold text-brand-brown truncate pr-2">Unload (Grp 1)</span>
+                  <span className="w-1/4 font-semibold text-brand-brown truncate pr-2">Unload</span>
                   <div className="w-3/4 h-6 bg-canvas rounded border border-borderClean relative flex items-center">
                     <div className="absolute left-0 w-1/4 h-full bg-surface-container-high border-r border-borderClean flex items-center justify-center font-eyebrow text-[9px] text-textMuted font-bold">
                       BREAK
                     </div>
-                    <div className="absolute left-1/4 w-3/4 h-full bg-canvas border-l border-borderClean flex items-center pl-2 font-mono text-[10px] text-brand-brown font-semibold">
-                      Active (5/5)
+                    <div className={`absolute left-1/4 w-3/4 h-full bg-canvas border-l border-borderClean flex items-center pl-2 font-mono text-[10px] font-semibold ${unload?.isShortfall ? 'text-status-risk' : 'text-brand-brown'}`}>
+                      Active ({unload?.available_headcount ?? '—'}/{unload?.required_headcount ?? '—'}){unload?.isShortfall ? ' - Short' : ''}
                     </div>
                   </div>
                 </div>
 
                 <div className="flex items-center">
-                  <span className="w-1/4 font-semibold text-brand-brown truncate pr-2">Sort (Grp A)</span>
+                  <span className="w-1/4 font-semibold text-brand-brown truncate pr-2">Sort</span>
                   <div className="w-3/4 h-6 bg-canvas rounded border border-borderClean relative flex items-center">
-                    <div className="absolute left-0 w-1/2 h-full bg-canvas border-r border-borderClean flex items-center pl-2 font-mono text-[10px] text-status-risk font-bold">
-                      Active (10/12) - Short
+                    <div className={`absolute left-0 w-1/2 h-full bg-canvas border-r border-borderClean flex items-center pl-2 font-mono text-[10px] font-bold ${sort?.isShortfall ? 'text-status-risk' : 'text-brand-brown'}`}>
+                      Active ({sort?.available_headcount ?? '—'}/{sort?.required_headcount ?? '—'}){sort?.isShortfall ? ' - Short' : ''}
                     </div>
                     <div className="absolute left-1/2 w-1/4 h-full bg-surface-container-high border-x border-borderClean flex items-center justify-center font-eyebrow text-[9px] text-textMuted font-bold">
                       BREAK
@@ -370,16 +384,19 @@ export const WorkforcePlanner: React.FC = () => {
                 </div>
 
                 <div className="flex items-center">
-                  <span className="w-1/4 font-semibold text-brand-brown truncate pr-2">Stow (All)</span>
+                  <span className="w-1/4 font-semibold text-brand-brown truncate pr-2">Stow</span>
                   <div className="w-3/4 h-6 bg-canvas rounded border border-borderClean relative flex items-center">
-                    <div className="absolute left-1/4 w-1/2 h-full bg-canvas border-x border-borderClean flex items-center pl-2 font-mono text-[10px] text-brand-brown font-semibold">
-                      Active (4/4)
+                    <div className={`absolute left-1/4 w-1/2 h-full bg-canvas border-x border-borderClean flex items-center pl-2 font-mono text-[10px] font-semibold ${stow?.isShortfall ? 'text-status-risk' : 'text-brand-brown'}`}>
+                      Active ({stow?.available_headcount ?? '—'}/{stow?.required_headcount ?? '—'}){stow?.isShortfall ? ' - Short' : ''}
                     </div>
                     <div className="absolute left-3/4 w-1/4 h-full bg-surface-container-high border-l border-borderClean flex items-center justify-center font-eyebrow text-[9px] text-textMuted font-bold">
                       BREAK
                     </div>
                   </div>
                 </div>
+                    </>
+                  );
+                })()}
               </div>
             </div>
           </div>

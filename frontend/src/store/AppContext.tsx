@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { API_BASE_URL, WS_BASE_URL } from '../config';
 
 export type TabType = 
   | 'command-center' 
@@ -32,6 +33,7 @@ interface AppContextType {
   setSelectedDate: (date: string) => void;
   alerts: AlertItem[];
   setAlerts: React.Dispatch<React.SetStateAction<AlertItem[]>>;
+  alertsLoading: boolean;
   privacyFloor: number;
   setPrivacyFloor: (floor: number) => void;
   wsData: any;
@@ -44,38 +46,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [selectedHub, setSelectedHub] = useState<string>('Hub 402-ATL');
   const [selectedShift, setSelectedShift] = useState<string>('Day');
   const [selectedDate, setSelectedDate] = useState<string>('2026-08-28');
-  const [alerts, setAlerts] = useState<AlertItem[]>([
-    {
-      alert_id: 'alt-001',
-      timestamp: '2026-08-28 10:02:00',
-      process: 'unload',
-      zone: 'Sort A Merge',
-      severity: 'risk',
-      alert_type: 'Jammed Conveyor C-14',
-      message: 'Sensor fault detected on C-14 merge lane. Backing up into Sort A.',
-      status: 'active'
-    },
-    {
-      alert_id: 'alt-002',
-      timestamp: '2026-08-28 09:45:00',
-      process: 'unload',
-      zone: 'Bay 4',
-      severity: 'risk',
-      alert_type: 'Unload Bay 4 Undermanned',
-      message: 'Processing rate dropped below 200pk/hr threshold. -2 headcount gap.',
-      status: 'active'
-    },
-    {
-      alert_id: 'alt-003',
-      timestamp: '2026-08-28 09:15:00',
-      process: 'inbound',
-      zone: 'Gate Ramp',
-      severity: 'watch',
-      alert_type: 'Trailer T-4921 Delayed',
-      message: 'Inbound trailer ETA revised. +15m delay due to gate congestion.',
-      status: 'active'
-    }
-  ]);
+  const [alerts, setAlerts] = useState<AlertItem[]>([]);
+  const [alertsLoading, setAlertsLoading] = useState<boolean>(true);
   const [privacyFloor, setPrivacyFloor] = useState<number>(5);
   const [wsData, setWsData] = useState<any>(null);
 
@@ -85,8 +57,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     let reconnectTimer: any;
 
     const connectWS = () => {
-      ws = new WebSocket('ws://localhost:8000/ws/live');
-      
+      ws = new WebSocket(`${WS_BASE_URL}/ws/live`);
+
       ws.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
@@ -117,16 +89,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
   }, []);
 
-  // Fetch initial alerts
+  // Fetch real alerts - no hardcoded seed data shown while this is in flight
   useEffect(() => {
-    fetch(`http://localhost:8000/api/dashboard/summary?date=${selectedDate}`)
-      .then(res => res.json())
+    setAlertsLoading(true);
+    fetch(`${API_BASE_URL}/api/dashboard/summary?date=${selectedDate}`)
+      .then(res => res.ok ? res.json() : Promise.reject(new Error(`HTTP ${res.status}`)))
       .then(data => {
-        if (data && data.alerts) {
-          setAlerts(data.alerts);
-        }
+        setAlerts(data?.alerts ?? []);
       })
-      .catch(err => console.error("Error fetching initial alerts:", err));
+      .catch(err => {
+        console.error("Error fetching initial alerts:", err);
+        setAlerts([]);
+      })
+      .finally(() => setAlertsLoading(false));
   }, [selectedDate]);
 
   return (
@@ -141,6 +116,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setSelectedDate,
       alerts,
       setAlerts,
+      alertsLoading,
       privacyFloor,
       setPrivacyFloor,
       wsData

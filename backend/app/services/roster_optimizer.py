@@ -1,4 +1,5 @@
 import json
+from datetime import datetime, timedelta
 from typing import List, Dict, Any
 from sqlalchemy.orm import Session
 from ortools.sat.python import cp_model
@@ -41,7 +42,7 @@ def optimize_shift_roster(db: Session, date_str: str, required_headcounts: Dict[
     # Fetch shift schedule of previous day to enforce rest rules (min 11 hours rest)
     # If a worker worked Twilight (14:00-22:00) or Night (22:00-06:00) yesterday,
     # they cannot work Day (06:00-14:00) today.
-    prev_date = (cp_model.datetime.datetime.strptime(date_str, "%Y-%m-%d") - cp_model.datetime.timedelta(days=1)).strftime("%Y-%m-%d")
+    prev_date = (datetime.strptime(date_str, "%Y-%m-%d") - timedelta(days=1)).strftime("%Y-%m-%d")
     prev_schedules = db.query(ShiftSchedule).filter(
         ShiftSchedule.schedule_date == prev_date,
         ShiftSchedule.shift_name.in_(["Twilight", "Night"]),

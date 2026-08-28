@@ -5,82 +5,66 @@ import { KpiCard } from '../components/KpiCard';
 import { VolumeBurnDown } from '../components/VolumeBurnDown';
 import { ZoneHeatmap } from '../components/ZoneHeatmap';
 import { AlertCircle, Clock, TrendingUp, Users, AlertTriangle, ShieldCheck, ArrowUpRight, Wrench, ChevronRight } from 'lucide-react';
-
-const FALLBACK_SUMMARY = {
-  oei_score: 0.87,
-  utilization_ratio: 0.78,
-  staffing_gap: -6,
-  process_kpis: [
-    { process: 'unload', zone: 'Unload Dock', oei: 0.85, throughput_ratio: 0.94, quality_ratio: 0.98, utilization_ratio: 0.94 },
-    { process: 'sort_a', zone: 'Primary Sort A', oei: 0.72, throughput_ratio: 0.80, quality_ratio: 0.95, utilization_ratio: 0.98 },
-    { process: 'sort_b', zone: 'Secondary Sort B', oei: 0.89, throughput_ratio: 0.91, quality_ratio: 0.99, utilization_ratio: 0.71 },
-    { process: 'pack', zone: 'Outbound Pack', oei: 0.92, throughput_ratio: 0.88, quality_ratio: 0.97, utilization_ratio: 0.48 },
-  ]
-};
-
-const FALLBACK_CHART = [
-  { timestamp: "2026-08-28 06:00", hour: 6, actual: 4200, p10: 3800, p50: 4400, p90: 5100 },
-  { timestamp: "2026-08-28 07:00", hour: 7, actual: 8100, p10: 7200, p50: 8000, p90: 8900 },
-  { timestamp: "2026-08-28 08:00", hour: 8, actual: 12400, p10: 10500, p50: 11800, p90: 13200 },
-  { timestamp: "2026-08-28 09:00", hour: 9, actual: 13800, p10: 12000, p50: 13500, p90: 14800 },
-  { timestamp: "2026-08-28 10:00", hour: 10, actual: 14200, p10: 12800, p50: 14000, p90: 15500 },
-  { timestamp: "2026-08-28 11:00", hour: 11, actual: null, p10: 11000, p50: 12500, p90: 14000 },
-  { timestamp: "2026-08-28 12:00", hour: 12, actual: null, p10: 8500, p50: 9800, p90: 11200 },
-  { timestamp: "2026-08-28 13:00", hour: 13, actual: null, p10: 5000, p50: 6200, p90: 7500 },
-];
-
-const FALLBACK_HEATMAP = [
-  { zone: "Unload Dock", process: "Inbound Unload", utilization: 94, state: "watch", active_workers: 18 },
-  { zone: "Primary Sort A", process: "High-Speed Sort", utilization: 98, state: "risk", active_workers: 24 },
-  { zone: "Secondary Sort B", process: "Manual Parcel Sort", utilization: 71, state: "ok", active_workers: 14 },
-  { zone: "Outbound Pack", process: "Palletization", utilization: 48, state: "idle", active_workers: 10 },
-  { zone: "Load Bay 4", process: "Trailer Staging", utilization: 84, state: "ok", active_workers: 12 },
-  { zone: "Gate Ramp", process: "Security Scan", utilization: 89, state: "watch", active_workers: 6 },
-];
+import { API_BASE_URL } from '../config';
 
 export const CommandCenter: React.FC = () => {
   const { selectedDate, selectedShift, wsData, alerts, setAlerts, setActiveTab } = useApp();
-  const [summaryData, setSummaryData] = useState<any>(FALLBACK_SUMMARY);
-  const [chartData, setChartData] = useState<any[]>(FALLBACK_CHART);
-  const [heatmapData, setHeatmapData] = useState<any[]>(FALLBACK_HEATMAP);
+  const [summaryData, setSummaryData] = useState<any>(null);
+  const [chartData, setChartData] = useState<any[]>([]);
+  const [heatmapData, setHeatmapData] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [dispatchedAlerts, setDispatchedAlerts] = useState<Record<string, boolean>>({});
 
-  // Fetch summary and chart data with fallback protection
+  // Fetch real summary, forecast chart, and heatmap data - no fallback constants
   useEffect(() => {
+    setLoading(true);
+    setError(null);
     const shiftQuery = selectedShift ? `&shift=${selectedShift}` : '';
-    
-    // Fetch summary
-    fetch(`http://localhost:8000/api/dashboard/summary?date=${selectedDate}${shiftQuery}`)
-      .then(res => res.ok ? res.json() : null)
-      .then(data => {
-        if (data) setSummaryData(data);
-      })
-      .catch(() => {});
 
-    // Fetch forecast chart
-    fetch(`http://localhost:8000/api/forecast/studio?horizon=1D&process=unload`)
-      .then(res => res.ok ? res.json() : null)
-      .then(data => {
-        if (data && data.chart_data?.length) setChartData(data.chart_data);
+    Promise.all([
+      fetch(`${API_BASE_URL}/api/dashboard/summary?date=${selectedDate}${shiftQuery}`)
+        .then(res => res.ok ? res.json() : Promise.reject(new Error(`summary: HTTP ${res.status}`))),
+      fetch(`${API_BASE_URL}/api/forecast/studio?horizon=1D&process=unload`)
+        .then(res => res.ok ? res.json() : Promise.reject(new Error(`forecast: HTTP ${res.status}`))),
+      fetch(`${API_BASE_URL}/api/dashboard/heatmap?date=${selectedDate}${shiftQuery}`)
+        .then(res => res.ok ? res.json() : Promise.reject(new Error(`heatmap: HTTP ${res.status}`))),
+    ])
+      .then(([summary, forecast, heatmap]) => {
+        setSummaryData(summary);
+        setChartData(forecast?.chart_data ?? []);
+        setHeatmapData(Array.isArray(heatmap) ? heatmap : []);
       })
-      .catch(() => {});
-
-    // Fetch heatmap
-    fetch(`http://localhost:8000/api/dashboard/heatmap?date=${selectedDate}${shiftQuery}`)
-      .then(res => res.ok ? res.json() : null)
-      .then(data => {
-        if (Array.isArray(data) && data.length) setHeatmapData(data);
+      .catch(err => {
+        console.error("Error loading Command Center data:", err);
+        setError("Could not reach the Synapse Ops API. Confirm the backend is running.");
       })
-      .catch(() => {});
-
+      .finally(() => setLoading(false));
   }, [selectedDate, selectedShift]);
 
-  // Live telemetry overlay values
-  const activeUnloadUph = wsData ? wsData.unload_uph : 1240;
+  // Live telemetry overlay - real recent UPH from the backend WebSocket, no synthetic fallback number
+  const activeUnloadUph = wsData ? wsData.unload_uph : null;
 
   const handleDispatch = (alertId: string, alertType: string) => {
     setDispatchedAlerts(prev => ({ ...prev, [alertId]: true }));
   };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-[500px] text-textMuted font-display uppercase tracking-widest text-xs">
+        Assembling Command Center Telemetry...
+      </div>
+    );
+  }
+
+  if (error || !summaryData) {
+    return (
+      <div className="flex flex-col items-center justify-center h-[500px] gap-3 text-center">
+        <AlertTriangle className="w-8 h-8 text-status-risk" />
+        <p className="text-sm text-brand-brown font-ui font-semibold">{error || "No data available."}</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -120,7 +104,7 @@ export const CommandCenter: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Shield Gauge (4 cols) */}
         <div className="lg:col-span-4">
-          <ShieldGauge score={summaryData.oei_score} delta={0.04} />
+          <ShieldGauge score={summaryData.oei_score} delta={summaryData.oei_delta_vs_last_week} />
         </div>
 
         {/* Hourly Volume Ingestion Chart (8 cols) */}
@@ -131,23 +115,20 @@ export const CommandCenter: React.FC = () => {
 
       {/* Row 2 (4 KPI Cards) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        <KpiCard 
-          label="AGGREGATE THROUGHPUT" 
-          value={activeUnloadUph} 
-          unit="pk/hr" 
-          delta={3.2} 
+        <KpiCard
+          label="UNLOAD THROUGHPUT (LIVE)"
+          value={activeUnloadUph !== null ? activeUnloadUph : '—'}
+          unit="pk/hr"
         />
-        <KpiCard 
-          label="DOCK-TO-DOOR CYCLE" 
-          value="42" 
-          unit="min" 
-          delta={-5.0} 
+        <KpiCard
+          label="DOCK-TO-DOOR CYCLE"
+          value={summaryData.avg_cycle_time_min}
+          unit="min"
         />
-        <KpiCard 
-          label="PRIMARY BELT UTILIZATION" 
-          value={`${Math.round(summaryData.utilization_ratio * 100)}%`} 
-          unit="prod" 
-          delta={2.0} 
+        <KpiCard
+          label="PRIMARY BELT UTILIZATION"
+          value={`${Math.round(summaryData.utilization_ratio * 100)}%`}
+          unit="prod"
         />
         <KpiCard 
           label="SHIFT HEADCOUNT GAP" 

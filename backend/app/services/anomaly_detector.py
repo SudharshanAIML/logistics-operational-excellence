@@ -47,33 +47,31 @@ def detect_volume_anomalies(db: Session, process: str = "unload") -> list:
     anomalies = df[df['anomaly_score'] == -1].copy()
     
     anomaly_events = []
-    
-    # Check if we should insert new alerts in the DB
-    cursor = db.connection().connection.cursor()
-    
+
     for _, row in anomalies.tail(10).iterrows():
         ts_str = row['timestamp'].strftime("%Y-%m-%d %H:%M:%S")
         alert_id = f"ANOM-{row['timestamp'].strftime('%y%m%d%H')}-{process}"
-        
+
         # Build message
         vol = int(row['actual_volume'])
         expected = int(row['actual_volume'] - row['residual'])
         dev_pct = round((vol - expected) / max(1, expected) * 100, 1)
-        
+
         severity = "risk" if abs(dev_pct) > 25.0 else "watch"
         direction = "surge" if dev_pct > 0 else "drop"
-        
+
         msg = f"Volume {direction} detected: {vol} items scanned vs expected {expected} ({dev_pct}% deviation)."
-        
-        # Check if already exists
-        cursor.execute("SELECT 1 FROM alerts WHERE alert_id = ?", (alert_id,))
-        if not cursor.fetchone():
-            cursor.execute("""
-            INSERT INTO alerts (alert_id, timestamp, process, zone, severity, alert_type, message, status)
-            VALUES (?, ?, ?, ?, ?, ?, ?, 'active')
-            """, (alert_id, ts_str, process, row['zone'], severity, "anomaly", msg))
+
+        # Insert via the ORM (portable across SQLite/Postgres, unlike the
+        # previous raw cursor with SQLite-only "?" placeholders)
+        already_exists = db.query(Alert).filter(Alert.alert_id == alert_id).first()
+        if not already_exists:
+            db.add(Alert(
+                alert_id=alert_id, timestamp=ts_str, process=process, zone=row['zone'],
+                severity=severity, alert_type="anomaly", message=msg, status="active"
+            ))
             db.commit()
-            
+
         anomaly_events.append({
             "timestamp": ts_str,
             "process": process,

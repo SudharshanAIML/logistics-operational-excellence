@@ -1,13 +1,45 @@
 import simpy
 import random
 import numpy as np
-from typing import Dict, Any
+from typing import Dict, Any, Optional
+from sqlalchemy import func
+from sqlalchemy.orm import Session
+from backend.app.db.models import DailyKPI, WorkerRoster
+
+def _get_real_baselines(db: Optional[Session]):
+    """
+    Derives baseline OEI/cycle-time from the most recent real day's daily_kpis
+    average instead of hardcoded literals, so the scenario "delta" the UI shows
+    is a comparison against real recent operations.
+    """
+    if db is None:
+        return 0.87, 42.0
+
+    latest_date = db.query(func.max(DailyKPI.date)).scalar()
+    if not latest_date:
+        return 0.87, 42.0
+
+    avg_oei, avg_cycle = db.query(
+        func.avg(DailyKPI.oei), func.avg(DailyKPI.avg_cycle_time_min)
+    ).filter(DailyKPI.date == latest_date).first()
+
+    return (float(avg_oei) if avg_oei is not None else 0.87,
+            float(avg_cycle) if avg_cycle is not None else 42.0)
+
+def _get_avg_wage(db: Optional[Session]) -> float:
+    """Real average hourly wage across the roster, replacing a made-up per-percent cost formula."""
+    if db is None:
+        return 22.0
+    avg_wage = db.query(func.avg(WorkerRoster.wage_rate)).scalar()
+    return float(avg_wage) if avg_wage is not None else 22.0
 
 def run_hub_simulation(
     inbound_surge_pct: float = 0.0,
     absenteeism_pct: float = 6.0,
+    efficiency_variance_pct: float = 0.0,
     num_iterations: int = 15,
-    sim_duration_min: int = 480 # 8 hour shift
+    sim_duration_min: int = 480, # 8 hour shift
+    db: Optional[Session] = None
 ) -> Dict[str, Any]:
     """
     Simulates the UPS Ground Hub operations using a discrete-event SimPy model.
@@ -69,8 +101,12 @@ def run_hub_simulation(
                 req = resources[p].request()
                 yield req
                 
-                # Service time per package
-                perf_mult = random.uniform(0.85, 1.15)
+                # Service time per package - efficiency_variance_pct shifts the
+                # center of the per-worker performance distribution (e.g. a
+                # cross-training or fatigue effect), instead of being a slider
+                # that was previously never passed to the simulation at all.
+                perf_mult = random.uniform(0.85, 1.15) * (1.0 + efficiency_variance_pct / 100.0)
+                perf_mult = max(0.1, perf_mult)
                 # scale service time for the resource capacity (active workers)
                 # Since multiple workers share the resource pool, wait time is handled by SimPy Resource capacity,
                 # but individual processing speed is modeled here.
@@ -117,25 +153,48 @@ def run_hub_simulation(
     avg_peak_backlog = int(np.mean([r["peak_backlog"] for r in iteration_results]))
     avg_sla_breach = np.mean([r["sla_breach_prob"] for r in iteration_results])
     
-    # Calculate OEI Impact
+    # Calculate OEI Impact - each ratio is clamped to [0, 1] since OEI is a
+    # product of three ratios and can never legitimately go negative or exceed 1.
     # Throughput drop if backlog piles up
-    throughput_mult = min(1.0, 1.0 - (avg_peak_backlog / 2500.0))
-    # Quality drop: congestion increases errors/damage
-    quality_mult = max(0.85, 0.985 - (inbound_surge_pct / 1000.0))
+    throughput_mult = max(0.0, min(1.0, 1.0 - (avg_peak_backlog / 2500.0)))
+    # Quality drop: congestion increases errors/damage (kept within its
+    # realistic modeled band; also capped at 1.0 since negative surge_pct
+    # would otherwise push this fractionally above 1)
+    quality_mult = max(0.85, min(1.0, 0.985 - (inbound_surge_pct / 1000.0)))
     # Utilization: high volume means high utilization, low volume means low utilization
-    utilization_mult = min(0.96, 0.82 + (inbound_surge_pct / 400.0) - (absenteeism_pct / 200.0))
-    
+    utilization_mult = max(0.0, min(0.96, 0.82 + (inbound_surge_pct / 400.0) - (absenteeism_pct / 200.0)))
+
     projected_oei = round(throughput_mult * quality_mult * utilization_mult, 3)
-    
-    # Baseline values for a normal day (0% surge, 6% absent)
-    baseline_oei = 0.87
-    baseline_cycle = 42.0
+
+    # Baseline values from the most recent real day's average, not hardcoded literals.
+    # baseline_backlog stays a structural simulation constant: backlog isn't a
+    # column anywhere in the schema, so there is no real number to source it from.
+    baseline_oei, baseline_cycle = _get_real_baselines(db)
     baseline_backlog = 180
-    
+
     oei_delta = round(projected_oei - baseline_oei, 3)
     cycle_delta = round(avg_sim_cycle - baseline_cycle, 1)
-    cost_impact = round((inbound_surge_pct * 145.0) - (absenteeism_pct * 80.0), 2)
-    
+
+    # Real labor cost: real average wage from worker_roster x headcount x 8h shift,
+    # replacing a made-up "surge_pct * 145 - absenteeism_pct * 80" formula
+    avg_wage = _get_avg_wage(db)
+    shift_hours = 8.0
+    baseline_headcount_total = sum(base_headcounts.values())
+    scenario_headcount_total = sum(actual_headcounts.values())
+    baseline_cost = round(baseline_headcount_total * shift_hours * avg_wage, 2)
+    simulated_cost = round(scenario_headcount_total * shift_hours * avg_wage, 2)
+    cost_impact = round(simulated_cost - baseline_cost, 2)
+
+    per_process = [
+        {
+            "process": p,
+            "base_headcount": base_headcounts[p],
+            "actual_headcount": actual_headcounts[p],
+            "standard_uph": uph_standards[p],
+        }
+        for p in uph_standards
+    ]
+
     return {
         "scenario": {
             "surge_pct": inbound_surge_pct,
@@ -143,13 +202,20 @@ def run_hub_simulation(
         },
         "metrics": {
             "projected_oei": projected_oei,
+            "baseline_oei": round(baseline_oei, 3),
             "oei_delta": oei_delta,
             "average_dock_to_stock_min": round(avg_sim_cycle, 1),
+            "baseline_dock_to_stock_min": round(baseline_cycle, 1),
             "cycle_time_delta_min": cycle_delta,
             "peak_backlog_items": avg_peak_backlog,
             "backlog_delta_items": avg_peak_backlog - baseline_backlog,
             "sla_breach_probability": round(avg_sla_breach, 2),
+            "baseline_headcount": baseline_headcount_total,
+            "scenario_headcount": scenario_headcount_total,
+            "baseline_cost": baseline_cost,
+            "simulated_cost": simulated_cost,
             "projected_cost_delta_usd": cost_impact
         },
-        "headcount_allocations": actual_headcounts
+        "headcount_allocations": actual_headcounts,
+        "per_process": per_process
     }

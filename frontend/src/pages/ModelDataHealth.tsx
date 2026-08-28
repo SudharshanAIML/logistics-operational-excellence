@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { Database, CheckCircle, AlertTriangle, RefreshCw } from 'lucide-react';
+import { Database, CheckCircle, XCircle, AlertTriangle, RefreshCw } from 'lucide-react';
+import { API_BASE_URL } from '../config';
 
 export const ModelDataHealth: React.FC = () => {
   const [healthStatus, setHealthStatus] = useState<any>(null);
   const [driftLogs, setDriftLogs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [recomputing, setRecomputing] = useState(false);
 
   // Fetch health data
@@ -14,39 +16,49 @@ export const ModelDataHealth: React.FC = () => {
 
   const fetchHealthData = () => {
     setLoading(true);
-    fetch(`http://localhost:8000/api/data-health/status`)
-      .then(res => res.json())
-      .then(data => {
-        setHealthStatus(data);
+    setError(null);
+    Promise.all([
+      fetch(`${API_BASE_URL}/api/data-health/status`)
+        .then(res => res.ok ? res.json() : Promise.reject(new Error(`status: HTTP ${res.status}`))),
+      fetch(`${API_BASE_URL}/api/data-health/drift`)
+        .then(res => res.ok ? res.json() : Promise.reject(new Error(`drift: HTTP ${res.status}`))),
+    ])
+      .then(([status, drift]) => {
+        setHealthStatus(status);
+        setDriftLogs(drift || []);
       })
-      .catch(err => console.error("Error fetching health status:", err));
-
-    fetch(`http://localhost:8000/api/data-health/drift`)
-      .then(res => res.json())
-      .then(data => {
-        setDriftLogs(data || []);
+      .catch(err => {
+        console.error("Error fetching data health:", err);
+        setError("Could not reach the Synapse Ops API. Confirm the backend is running.");
       })
-      .catch(err => console.error("Error fetching model drift:", err))
       .finally(() => setLoading(false));
   };
 
   const handleRetrainAll = () => {
     setRecomputing(true);
-    // Retrain in background
-    fetch(`http://localhost:8000/api/forecast/train?process=unload`, { method: 'POST' })
-      .then(res => res.json())
+    fetch(`${API_BASE_URL}/api/forecast/train?process=unload`, { method: 'POST' })
+      .then(res => res.ok ? res.json() : Promise.reject(new Error(`HTTP ${res.status}`)))
       .then(data => {
-        alert("LightGBM volume forecast retraining triggered!");
+        alert(`LightGBM retraining complete! WAPE: ${data.wape}%, Baseline: ${data.baseline_wape}%`);
         fetchHealthData();
       })
-      .catch(err => console.error("Error retraining models:", err))
+      .catch(err => alert(`Retraining failed: ${err.message}`))
       .finally(() => setRecomputing(false));
   };
 
-  if (loading || !healthStatus) {
+  if (loading) {
     return (
       <div className="flex items-center justify-center h-[500px] text-textMuted font-display uppercase tracking-widest text-xs">
         Connecting to Data Quality Pipelines...
+      </div>
+    );
+  }
+
+  if (error || !healthStatus) {
+    return (
+      <div className="flex flex-col items-center justify-center h-[500px] gap-3 text-center">
+        <AlertTriangle className="w-8 h-8 text-status-risk" />
+        <p className="text-sm text-brand-brown font-ui font-semibold">{error || "No health data available."}</p>
       </div>
     );
   }
@@ -118,7 +130,11 @@ export const ModelDataHealth: React.FC = () => {
             <div className="space-y-2.5">
               {healthStatus.rules.map((r: any, idx: number) => (
                 <div key={idx} className="flex gap-2 items-start text-xs font-ui">
-                  <CheckCircle className="w-4 h-4 mt-0.5 text-brand-green shrink-0" />
+                  {r.status === 'passed' ? (
+                    <CheckCircle className="w-4 h-4 mt-0.5 text-brand-green shrink-0" />
+                  ) : (
+                    <XCircle className="w-4 h-4 mt-0.5 text-status-risk shrink-0" />
+                  )}
                   <div>
                     <span className="font-semibold text-brand-brown font-mono">{r.rule_name}</span>
                     <p className="text-[10px] text-textMuted leading-tight mt-0.5">{r.message}</p>

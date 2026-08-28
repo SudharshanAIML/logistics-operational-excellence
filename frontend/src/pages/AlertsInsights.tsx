@@ -1,25 +1,30 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../store/AppContext';
-import { AlertCircle, MessageSquare, Send, HelpCircle, FileText } from 'lucide-react';
+import { AlertCircle, MessageSquare, Send, FileText, AlertTriangle } from 'lucide-react';
+import { API_BASE_URL } from '../config';
 
 export const AlertsInsights: React.FC = () => {
-  const { selectedDate, alerts } = useApp();
+  const { selectedDate, alerts, alertsLoading } = useApp();
   const [query, setQuery] = useState('');
   const [copilotResponse, setCopilotResponse] = useState<string>('');
   const [copilotLoading, setCopilotLoading] = useState(false);
   const [narrativeSummary, setNarrativeSummary] = useState<string>('');
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   // Fetch initial summary narrative
   useEffect(() => {
     setLoading(true);
-    // Fetch deterministic ops narrative for selectedDate
-    fetch(`http://localhost:8000/api/copilot/ask?query=Summarize%20ops%20status%20for%20today`)
-      .then(res => res.json())
+    setError(null);
+    fetch(`${API_BASE_URL}/api/copilot/ask?query=Summarize%20ops%20status%20for%20today`)
+      .then(res => res.ok ? res.json() : Promise.reject(new Error(`HTTP ${res.status}`)))
       .then(data => {
         setNarrativeSummary(data.response);
       })
-      .catch(err => console.error("Error fetching narrative summary:", err))
+      .catch(err => {
+        console.error("Error fetching narrative summary:", err);
+        setError("Could not reach the Synapse Ops Copilot. Confirm the backend is running.");
+      })
       .finally(() => setLoading(false));
   }, [selectedDate]);
 
@@ -31,14 +36,14 @@ export const AlertsInsights: React.FC = () => {
     setCopilotLoading(true);
     setCopilotResponse('');
 
-    fetch(`http://localhost:8000/api/copilot/ask?query=${encodeURIComponent(query)}`)
-      .then(res => res.json())
+    fetch(`${API_BASE_URL}/api/copilot/ask?query=${encodeURIComponent(query)}`)
+      .then(res => res.ok ? res.json() : Promise.reject(new Error(`HTTP ${res.status}`)))
       .then(data => {
         setCopilotResponse(data.response);
       })
       .catch(err => {
         console.error("Error questioning copilot:", err);
-        setCopilotResponse("Error connecting to Synapse Copilot services. Please verify backend running status.");
+        setCopilotResponse(`Error connecting to Synapse Copilot: ${err.message}. Please verify the backend is running.`);
       })
       .finally(() => setCopilotLoading(false));
   };
@@ -47,6 +52,15 @@ export const AlertsInsights: React.FC = () => {
     return (
       <div className="flex items-center justify-center h-[500px] text-textMuted font-display uppercase tracking-widest text-xs">
         Assembling Anomalies Logs...
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center h-[500px] gap-3 text-center">
+        <AlertTriangle className="w-8 h-8 text-status-risk" />
+        <p className="text-sm text-brand-brown font-ui font-semibold">{error}</p>
       </div>
     );
   }
@@ -72,7 +86,9 @@ export const AlertsInsights: React.FC = () => {
           </div>
 
           <div className="space-y-3.5 max-h-[420px] overflow-y-auto pr-1">
-            {alerts.length === 0 ? (
+            {alertsLoading ? (
+              <p className="text-xs text-textMuted italic py-4">Loading alerts...</p>
+            ) : alerts.length === 0 ? (
               <p className="text-xs text-textMuted italic py-4">No active anomalies detected.</p>
             ) : (
               alerts.map((a: any) => (

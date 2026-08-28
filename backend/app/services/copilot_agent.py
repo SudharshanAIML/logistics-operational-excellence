@@ -1,9 +1,38 @@
 import re
+import json
 import requests
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 from datetime import datetime, timedelta
 from backend.app.core.config import settings
 from backend.app.db.models import DailyKPI, Alert, HourlyVolume
+
+WEEKDAYS = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
+
+def _latest_date(db: Session) -> datetime:
+    latest_str = db.query(func.max(DailyKPI.date)).scalar()
+    return datetime.strptime(latest_str, "%Y-%m-%d") if latest_str else datetime.now()
+
+def _resolve_target_date(db: Session, query_lower: str) -> datetime:
+    """
+    Resolves relative date phrases against the real latest date in the data,
+    instead of hardcoded calendar literals that only matched one specific dataset snapshot.
+    """
+    latest = _latest_date(db)
+
+    if "today" in query_lower:
+        return latest
+    if "yesterday" in query_lower:
+        return latest - timedelta(days=1)
+
+    for i, day_name in enumerate(WEEKDAYS):
+        if day_name in query_lower:
+            # Most recent occurrence of that weekday on or before "latest"
+            days_back = (latest.weekday() - i) % 7
+            return latest - timedelta(days=days_back)
+
+    # Default: most recent occurrence of the same weekday as "latest" one week back
+    return latest - timedelta(days=7)
 
 def ask_ops_copilot(db: Session, query: str) -> dict:
     """
@@ -12,25 +41,11 @@ def ask_ops_copilot(db: Session, query: str) -> dict:
     and returns a narrative explanation of anomalies, weather effects, and metrics.
     """
     query_lower = query.lower()
-    
-    # 1. Date/Process Parsing (Simple entity extraction)
-    # Target date default (let's assume last Tuesday relative to August 28, 2026, which is August 25, 2026)
-    target_date = datetime(2026, 8, 25)
-    target_date_str = "2026-08-25"
-    
-    if "today" in query_lower:
-        target_date_str = "2026-08-28"
-        target_date = datetime(2026, 8, 28)
-    elif "yesterday" in query_lower:
-        target_date_str = "2026-08-27"
-        target_date = datetime(2026, 8, 27)
-    elif "monday" in query_lower:
-        target_date_str = "2026-08-24"
-        target_date = datetime(2026, 8, 24)
-    elif "tuesday" in query_lower:
-        target_date_str = "2026-08-25"
-        target_date = datetime(2026, 8, 25)
-    
+
+    # 1. Date/Process Parsing (Simple entity extraction), resolved against real data
+    target_date = _resolve_target_date(db, query_lower)
+    target_date_str = target_date.strftime("%Y-%m-%d")
+
     # Process extraction
     process_target = None
     for p in ["unload", "sort", "stow", "pick", "pack", "load"]:
@@ -51,8 +66,8 @@ def ask_ops_copilot(db: Session, query: str) -> dict:
         vol_query = vol_query.filter(HourlyVolume.process == process_target)
     vols = vol_query.all()
     
-    avg_temp = sum(v.temp for v in vols) / len(vols) if vols else 22.0
-    total_rain = sum(v.rain for v in vols) / 6.0 if vols else 0.0 # roughly daily accumulated
+    avg_temp = round(sum(v.temp for v in vols) / len(vols), 1) if vols else 22.0
+    total_rain = round(sum(v.rain for v in vols) / 6.0, 1) if vols else 0.0 # roughly daily accumulated
     
     # Query Alerts for that day
     alert_query = db.query(Alert).filter(Alert.timestamp.like(f"{target_date_str}%"))

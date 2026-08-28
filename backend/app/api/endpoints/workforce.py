@@ -1,7 +1,9 @@
 import math
 from fastapi import APIRouter, Depends, Query, Body
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 from backend.app.db.database import get_db
+from backend.app.db.models import HourlyVolume
 from backend.app.services import roster_optimizer, oei_calculator
 from typing import Dict, Any
 
@@ -15,35 +17,36 @@ def get_workforce_gaps(
     """
     Computes forecasted volume, required hours, headcount, and active roster gap.
     """
+    date = oei_calculator.get_nearest_available_date(db, date)
+
     # Query daily KPIs for available/actual workers
     kpis = oei_calculator.get_oei_summary(db, date)
-    
+
     # Volume and standards
     standards = {
         "unload": 140, "sort": 320, "stow": 110, "pick": 180, "pack": 150, "load": 200
     }
-    
-    # We will simulate the forecasted volume and hours for each process
+
+    # Real forecasted daily volume per process, summed from hourly_volume.forecast_p50
+    volume_rows = db.query(
+        HourlyVolume.process, func.sum(HourlyVolume.forecast_p50)
+    ).filter(HourlyVolume.timestamp.like(f"{date}%")).group_by(HourlyVolume.process).all()
+    forecast_volumes = {p: int(v) for p, v in volume_rows}
+
     gaps_table = []
     total_fcst_vol = 0
     total_req_hours = 0.0
     total_req_hc = 0
     total_avail_hc = 0
     total_gap = 0
-    
+
     for p, std in standards.items():
         # Match kpi row
         kpi_row = next((k for k in kpis if k["process"] == p), None)
         active_wc = kpi_row["active_worker_count"] if kpi_row else 0
-        
-        # Calculate volume
-        mock_volumes = {
-            "unload": 4200, "sort": 12800, "stow": 3900, 
-            "pick": 8400, "pack": 7100, "load": 9500
-        }
-        
-        vol = mock_volumes[p]
-        req_hrs = round(vol / std, 1)
+
+        vol = forecast_volumes.get(p, 0)
+        req_hrs = round(vol / std, 1) if std else 0.0
         req_hc = max(2, math.ceil(req_hrs / 8.0))
         
         gap = active_wc - req_hc
@@ -86,6 +89,8 @@ def optimize_roster(
     """
     Runs the CP-SAT optimizer to resolve roster constraints.
     """
+    date = oei_calculator.get_nearest_available_date(db, date)
+
     if requirements is None:
         # Default fallback requirements
         requirements = {

@@ -1,74 +1,50 @@
 import React, { useState, useEffect } from 'react';
 import { VolumeBurnDown } from '../components/VolumeBurnDown';
 import { Download, Activity, HelpCircle, Sliders, ArrowUpRight, ChevronDown, RefreshCw, Zap, AlertTriangle } from 'lucide-react';
-
-const FALLBACK_ACCURACY = {
-  lgbm_wape: 8.4,
-  naive_wape: 19.1,
-  improvement_pct: 10.7,
-  bias_pct: -1.2
-};
-
-const FALLBACK_DRIVERS = [
-  { driver: "Weather & Road Conditions", impact: 4.8, direction: "positive", description: "Clear interstate speeds increased inbound arrival density." },
-  { driver: "Shift Overlap Staging", impact: -2.3, direction: "negative", description: "Brief gate backlog during 07:45 shift changeover." },
-  { driver: "E-Commerce Promo Surge", impact: 6.1, direction: "positive", description: "Higher volume from regional fulfillment nodes." },
-  { driver: "Sort Conveyor Maintenance", impact: -1.5, direction: "negative", description: "Belt C-14 speed limit offset." },
-];
-
-const FALLBACK_CHART_DATA = [
-  { timestamp: "2026-08-28 06:00", hour: 6, actual: 14550, p10: 12400, p50: 14200, p90: 16100, status: "NOMINAL" },
-  { timestamp: "2026-08-28 07:00", hour: 7, actual: 18100, p10: 15100, p50: 17800, p90: 19200, status: "NOMINAL" },
-  { timestamp: "2026-08-28 08:00", hour: 8, actual: 24800, p10: 18000, p50: 21500, p90: 23100, status: "ANOMALY" },
-  { timestamp: "2026-08-28 09:00", hour: 9, actual: 21800, p10: 19500, p50: 22000, p90: 24500, status: "NOMINAL" },
-  { timestamp: "2026-08-28 10:00", hour: 10, actual: 19850, p10: 17200, p50: 19800, p90: 21000, status: "NOMINAL" },
-  { timestamp: "2026-08-28 11:00", hour: 11, actual: null, p10: 14800, p50: 16500, p90: 18200, status: "PENDING" },
-  { timestamp: "2026-08-28 12:00", hour: 12, actual: null, p10: 11200, p50: 13000, p90: 14800, status: "PENDING" },
-  { timestamp: "2026-08-28 13:00", hour: 13, actual: null, p10: 8000, p50: 9500, p90: 11000, status: "PENDING" },
-];
+import { API_BASE_URL } from '../config';
 
 export const ForecastStudio: React.FC = () => {
   const [horizon, setHorizon] = useState<string>('1D');
   const [process, setProcess] = useState<string>('unload');
-  const [chartData, setChartData] = useState<any[]>(FALLBACK_CHART_DATA);
-  const [accuracy, setAccuracy] = useState<any>(FALLBACK_ACCURACY);
-  const [drivers, setDrivers] = useState<any[]>(FALLBACK_DRIVERS);
+  const [chartData, setChartData] = useState<any[]>([]);
+  const [accuracy, setAccuracy] = useState<any>(null);
+  const [drivers, setDrivers] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [retraining, setRetraining] = useState(false);
 
-  // Fetch forecast data and drivers with fallback
+  // Fetch real forecast data and real SHAP drivers - no fallback constants
   useEffect(() => {
-    fetch(`http://localhost:8000/api/forecast/studio?horizon=${horizon}&process=${process}`)
-      .then(res => res.ok ? res.json() : null)
-      .then(data => {
-        if (data) {
-          if (data.chart_data?.length) setChartData(data.chart_data);
-          if (data.accuracy) setAccuracy(data.accuracy);
-        }
-      })
-      .catch(() => {});
+    setLoading(true);
+    setError(null);
 
-    fetch(`http://localhost:8000/api/forecast/drivers`)
-      .then(res => res.ok ? res.json() : null)
-      .then(data => {
-        if (Array.isArray(data) && data.length) setDrivers(data);
+    Promise.all([
+      fetch(`${API_BASE_URL}/api/forecast/studio?horizon=${horizon}&process=${process}`)
+        .then(res => res.ok ? res.json() : Promise.reject(new Error(`studio: HTTP ${res.status}`))),
+      fetch(`${API_BASE_URL}/api/forecast/drivers?process=${process}`)
+        .then(res => res.ok ? res.json() : Promise.reject(new Error(`drivers: HTTP ${res.status}`))),
+    ])
+      .then(([studio, driverList]) => {
+        setChartData(studio?.chart_data ?? []);
+        setAccuracy(studio?.accuracy ?? null);
+        setDrivers(Array.isArray(driverList) ? driverList : []);
       })
-      .catch(() => {});
-
+      .catch(err => {
+        console.error("Error loading Forecast Studio data:", err);
+        setError("Could not reach the Synapse Ops API. Confirm the backend is running.");
+      })
+      .finally(() => setLoading(false));
   }, [horizon, process]);
 
   // Retrain Trigger
   const handleRetrain = () => {
     setRetraining(true);
-    fetch(`http://localhost:8000/api/forecast/train?process=${process}`, { method: 'POST' })
-      .then(res => res.ok ? res.json() : null)
+    fetch(`${API_BASE_URL}/api/forecast/train?process=${process}`, { method: 'POST' })
+      .then(res => res.ok ? res.json() : Promise.reject(new Error(`HTTP ${res.status}`)))
       .then(data => {
-        if (data) {
-          alert(`LightGBM Retraining Complete! WAPE: ${data.wape}%, Baseline: ${data.baseline_wape}%`);
-        } else {
-          alert("LightGBM Model Retraining initiated in background pipeline.");
-        }
+        alert(`LightGBM Retraining Complete! WAPE: ${data.wape}%, Baseline: ${data.baseline_wape}%`);
       })
-      .catch(() => alert("Retraining pipeline executed (Simulated background worker)."))
+      .catch(err => alert(`Retraining failed: ${err.message}`))
       .finally(() => setRetraining(false));
   };
 
@@ -98,6 +74,23 @@ export const ForecastStudio: React.FC = () => {
     link.click();
     document.body.removeChild(link);
   };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-[500px] text-textMuted font-display uppercase tracking-widest text-xs">
+        Assembling Forecast Matrix...
+      </div>
+    );
+  }
+
+  if (error || !accuracy) {
+    return (
+      <div className="flex flex-col items-center justify-center h-[500px] gap-3 text-center">
+        <AlertTriangle className="w-8 h-8 text-status-risk" />
+        <p className="text-sm text-brand-brown font-ui font-semibold">{error || "No forecast data available."}</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -179,10 +172,14 @@ export const ForecastStudio: React.FC = () => {
                   </p>
                   <div className="flex items-baseline gap-3">
                     <span className="font-mono text-3xl font-bold text-brand-brown tabular-nums">
-                      {accuracy.lgbm_wape || 8.4}%
+                      {accuracy.lgbm_wape}%
                     </span>
-                    <span className="bg-brand-green/15 text-brand-green border border-brand-green/30 font-display text-[11px] font-bold px-2 py-0.5 rounded-badge uppercase tracking-wider">
-                      +{accuracy.improvement_pct || 10.7}% LIFT
+                    <span className={`font-display text-[11px] font-bold px-2 py-0.5 rounded-badge uppercase tracking-wider border ${
+                      accuracy.improvement_pct >= 0
+                        ? 'bg-brand-green/15 text-brand-green border-brand-green/30'
+                        : 'bg-status-risk/15 text-status-risk border-status-risk/30'
+                    }`}>
+                      {accuracy.improvement_pct >= 0 ? '+' : ''}{accuracy.improvement_pct}% {accuracy.improvement_pct >= 0 ? 'LIFT' : 'WORSE'}
                     </span>
                   </div>
                 </div>
@@ -192,7 +189,7 @@ export const ForecastStudio: React.FC = () => {
                     BASELINE (HISTORICAL NAIVE)
                   </p>
                   <span className="font-mono text-lg text-textMuted line-through tabular-nums">
-                    {accuracy.naive_wape || 19.1}%
+                    {accuracy.naive_wape}%
                   </span>
                 </div>
               </div>
@@ -217,7 +214,7 @@ export const ForecastStudio: React.FC = () => {
                 PREDICTION BIAS METER
               </span>
               <span className="font-mono text-xs font-bold text-brand-gold">
-                {accuracy.bias_pct || -1.2}%
+                {accuracy.bias_pct}%
               </span>
             </div>
 
@@ -225,12 +222,12 @@ export const ForecastStudio: React.FC = () => {
             <div className="relative h-3 bg-surfaceAlt rounded-full overflow-hidden border border-borderClean">
               {/* Zero center marker line */}
               <div className="absolute left-1/2 top-0 bottom-0 w-[2px] bg-brand-brown/40 z-10"></div>
-              {/* Bias Offset Fill (-1.2% is slightly left of 50%) */}
-              <div 
+              {/* Bias Offset Fill */}
+              <div
                 className="absolute top-0 bottom-0 bg-brand-gold rounded-full"
-                style={{ 
-                  left: `${50 + (accuracy.bias_pct || -1.2) * 2}%`, 
-                  right: `${50 - Math.abs(accuracy.bias_pct || -1.2) * 2}%` 
+                style={{
+                  left: `${Math.max(0, Math.min(100, 50 + accuracy.bias_pct * 2))}%`,
+                  right: `${Math.max(0, Math.min(100, 50 - accuracy.bias_pct * 2))}%`
                 }}
               ></div>
             </div>
@@ -332,8 +329,10 @@ export const ForecastStudio: React.FC = () => {
               <tbody className="divide-y divide-borderClean font-mono tabular-nums">
                 {chartData.map((r: any, idx: number) => {
                   const variance = r.actual !== null ? r.actual - r.p50 : 0;
-                  const isAnomaly = r.status === 'ANOMALY' || Math.abs(variance) > 2000;
-                  const isCurrent = r.status === 'PENDING' && idx === chartData.findIndex(p => p.actual === null);
+                  // Anomaly = actual fell outside the model's own P10-P90 forecast interval,
+                  // a threshold that scales with the process instead of a fixed unit count
+                  const isAnomaly = r.actual !== null && (r.actual < r.p10 || r.actual > r.p90);
+                  const isCurrent = idx === chartData.findIndex(p => p.actual === null);
 
                   return (
                     <tr 

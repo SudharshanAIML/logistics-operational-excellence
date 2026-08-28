@@ -17,11 +17,14 @@ def get_forecast_studio(
     return forecasting.get_forecast_studio_data(db, horizon, process)
 
 @router.get("/drivers")
-def get_forecast_drivers():
+def get_forecast_drivers(
+    process: str = Query("unload", description="Process type"),
+    db: Session = Depends(get_db)
+):
     """
-    Returns the driver breakdown panel explaining forecast variations (SHAP drivers).
+    Returns the driver breakdown panel explaining forecast variations (real SHAP values).
     """
-    return forecasting.get_forecast_drivers()
+    return forecasting.get_forecast_drivers(db, process)
 
 @router.post("/train")
 def train_forecast_model(
