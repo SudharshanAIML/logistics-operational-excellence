@@ -4,1469 +4,612 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>SYNAPSE OPS — UPS Logistics Intelligence Platform</title>
-<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@300;400;600;700;800;900&family=Barlow:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@300;400;500;600;700;800;900&family=Barlow:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
-  :root {
-    --ups-brown: #351C15;
-    --ups-brown-dark: #180703;
-    --ups-gold: #FFB500;
-    --ups-gold-dim: #E0A000;
-    --ups-green: #64A70B;
-    --ups-red: #C0392B;
-    --text-light: #FFF9F0;
-    --text-muted: #C4B49E;
-    --slide-w: 1280px;
-    --slide-h: 720px;
-  }
+*{margin:0;padding:0;box-sizing:border-box;}
+:root{
+  --brown:#1C0D08;--brown2:#2A1410;--gold:#FFB500;--gold2:#E0A000;
+  --green:#64A70B;--red:#C0392B;--text:#FFF8F0;--muted:#A8927E;--dim:#6B5040;
+}
+html,body{width:100%;height:100%;overflow:hidden;background:#000;}
+.deck{width:100vw;height:100vh;position:relative;background:var(--brown);}
+.slide{position:absolute;inset:0;display:none;flex-direction:column;overflow:hidden;}
+.slide.active{display:flex;}
+.bg-grid{
+  position:absolute;inset:0;
+  background-image:linear-gradient(rgba(255,181,0,.035) 1px,transparent 1px),linear-gradient(90deg,rgba(255,181,0,.035) 1px,transparent 1px);
+  background-size:56px 56px;pointer-events:none;z-index:0;
+}
+.bg-radial{position:absolute;border-radius:50%;background:radial-gradient(circle,rgba(255,181,0,.10) 0%,transparent 70%);pointer-events:none;z-index:0;}
+.accent-line{position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,var(--gold) 0%,var(--gold2) 50%,transparent 100%);z-index:10;}
+.nav{
+  position:fixed;bottom:28px;left:50%;transform:translateX(-50%);
+  display:flex;align-items:center;gap:6px;
+  background:rgba(10,5,2,.75);border:1px solid rgba(255,181,0,.2);
+  border-radius:40px;padding:8px 16px;z-index:1000;backdrop-filter:blur(16px);
+}
+.nav-btn{
+  width:32px;height:32px;border-radius:50%;border:none;background:transparent;color:var(--muted);
+  font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:700;letter-spacing:.5px;
+  cursor:pointer;transition:all .2s;display:flex;align-items:center;justify-content:center;
+}
+.nav-btn:hover{color:var(--gold);}
+.nav-btn.active{background:var(--gold);color:var(--brown);}
+.nav-sep{width:1px;height:20px;background:rgba(255,181,0,.15);margin:0 4px;}
+.nav-arr{
+  width:32px;height:32px;border-radius:50%;
+  background:rgba(255,181,0,.08);border:1px solid rgba(255,181,0,.2);
+  color:var(--gold);font-size:14px;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;transition:all .2s;
+}
+.nav-arr:hover{background:rgba(255,181,0,.2);}
+.slide-num{position:absolute;top:24px;right:36px;font-family:'IBM Plex Mono',monospace;font-size:11px;color:rgba(255,181,0,.4);letter-spacing:2px;z-index:10;}
+.shield{
+  display:inline-flex;align-items:center;justify-content:center;
+  width:36px;height:44px;background:var(--gold);
+  clip-path:polygon(0 0,100% 0,100% 72%,50% 100%,0 72%);
+  font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:900;color:var(--brown);letter-spacing:-.5px;flex-shrink:0;
+}
+.eyebrow{font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:var(--gold);opacity:.75;}
+.sec-title{font-family:'Barlow Condensed',sans-serif;font-size:clamp(40px,4.5vw,60px);font-weight:800;line-height:.95;color:var(--text);text-transform:uppercase;margin:12px 0 28px;}
+.sec-title .g{color:var(--gold);}
+.tag{background:rgba(255,181,0,.09);border:1px solid rgba(255,181,0,.25);color:rgba(255,181,0,.85);padding:5px 14px;border-radius:100px;font-size:11px;font-weight:600;letter-spacing:1px;text-transform:uppercase;font-family:'Barlow Condensed',sans-serif;}
+.slide-footer{position:absolute;bottom:0;left:0;right:0;height:40px;background:rgba(0,0,0,.5);border-top:1px solid rgba(255,181,0,.08);display:flex;align-items:center;justify-content:space-between;padding:0 40px;z-index:5;}
+.slide-footer span{font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:rgba(255,181,0,.3);letter-spacing:1.5px;text-transform:uppercase;}
 
-  * { margin: 0; padding: 0; box-sizing: border-box; }
+/* ── S0 HERO ── */
+#s0{background:linear-gradient(135deg,#120600 0%,#1E0A02 60%,#140600 100%);}
+.s0-inner{position:relative;z-index:2;display:grid;grid-template-columns:1fr 480px;height:100%;}
+.s0-left{display:flex;flex-direction:column;justify-content:center;padding:72px 72px 120px;}
+.s0-right{display:flex;align-items:center;justify-content:center;padding:72px 56px 120px;}
+.hero-title{font-family:'Barlow Condensed',sans-serif;font-size:clamp(80px,10vw,128px);font-weight:900;line-height:.88;color:var(--text);text-transform:uppercase;margin:18px 0 12px;}
+.hero-title .g{color:var(--gold);}
+.hero-sub{font-size:17px;color:var(--muted);line-height:1.65;max-width:520px;margin:20px 0 40px;}
+.hero-tags{display:flex;flex-wrap:wrap;gap:8px;}
+.oei-ring{width:360px;height:360px;border-radius:50%;border:1px solid rgba(255,181,0,.15);display:flex;align-items:center;justify-content:center;position:relative;background:radial-gradient(circle at 40% 35%,rgba(255,181,0,.08),transparent 70%);}
+.oei-ring::before{content:'';position:absolute;width:78%;height:78%;border-radius:50%;border:1px solid rgba(255,181,0,.08);}
+.oei-ring::after{content:'';position:absolute;width:56%;height:56%;border-radius:50%;border:1px solid rgba(255,181,0,.08);}
+.oei-center{text-align:center;position:relative;z-index:1;}
+.oei-big{font-family:'Barlow Condensed',sans-serif;font-size:96px;font-weight:900;color:var(--gold);line-height:.9;}
+.oei-caption{font-family:'Barlow Condensed',sans-serif;font-size:13px;letter-spacing:3px;color:var(--muted);text-transform:uppercase;margin:10px 0 14px;}
+.oei-formula{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--dim);line-height:1.8;}
+.oei-formula span{color:var(--gold);opacity:.7;}
+.orbit-dot{position:absolute;width:8px;height:8px;border-radius:50%;background:var(--gold);box-shadow:0 0 8px var(--gold);}
 
-  body {
-    font-family: 'Barlow', sans-serif;
-    background: #0D0503;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    padding: 20px;
-    gap: 12px;
-    min-height: 100vh;
-  }
+/* ── S1 PROBLEM ── */
+#s1{background:linear-gradient(150deg,#0E0501 0%,#180A04 100%);}
+.s1-inner{position:relative;z-index:2;display:grid;grid-template-columns:1fr 1fr;height:100%;gap:0;}
+.s1-left{padding:64px 56px 100px;border-right:1px solid rgba(255,181,0,.08);display:flex;flex-direction:column;}
+.s1-right{padding:64px 56px 100px;display:flex;flex-direction:column;justify-content:space-between;}
+.pain-list{display:flex;flex-direction:column;gap:18px;margin-top:8px;}
+.pain{display:flex;gap:16px;align-items:flex-start;}
+.pain-dot{width:6px;height:6px;border-radius:50%;background:var(--red);flex-shrink:0;margin-top:8px;box-shadow:0 0 6px var(--red);}
+.pain-body{font-size:14px;color:var(--muted);line-height:1.55;}
+.pain-body strong{color:var(--text);font-weight:600;}
+.quote-block{background:rgba(255,181,0,.05);border:1px solid rgba(255,181,0,.18);border-left:3px solid var(--gold);border-radius:6px;padding:24px 28px;}
+.quote-block p{font-size:16px;color:var(--text);font-style:italic;line-height:1.65;}
+.quote-src{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--gold);letter-spacing:1px;text-transform:uppercase;margin-top:12px;}
+.stat-trio{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;}
+.stat-c{background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.06);border-radius:10px;padding:20px 16px;text-align:center;}
+.stat-n{font-family:'Barlow Condensed',sans-serif;font-size:48px;font-weight:900;color:var(--gold);line-height:1;}
+.stat-l{font-size:11px;color:var(--muted);margin-top:6px;line-height:1.4;}
+.headline-box{background:rgba(255,181,0,.06);border:1px solid rgba(255,181,0,.2);border-radius:8px;padding:22px 24px;}
+.headline-box h3{font-family:'Barlow Condensed',sans-serif;font-size:15px;font-weight:700;color:var(--gold);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;}
+.headline-box p{font-size:13px;color:var(--muted);line-height:1.65;}
+.headline-box em{color:var(--text);}
+.headline-box strong{color:var(--gold);}
 
-  /* ── NAV ── */
-  .nav {
-    width: var(--slide-w);
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 10px 20px;
-    background: rgba(255,255,255,0.04);
-    border-radius: 8px;
-    border: 1px solid rgba(255,181,0,0.2);
-    position: sticky;
-    top: 10px;
-    z-index: 100;
-    backdrop-filter: blur(12px);
-  }
+/* ── S2 MODULES ── */
+#s2{background:#0F0602;}
+.s2-inner{position:relative;z-index:2;height:100%;display:flex;flex-direction:column;padding:52px 60px 90px;}
+.modules-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:18px;flex:1;margin-top:32px;}
+.mod-card{background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.07);border-radius:12px;padding:28px 22px;display:flex;flex-direction:column;gap:14px;position:relative;overflow:hidden;}
+.mod-card::after{content:'';position:absolute;top:0;left:0;right:0;height:2px;}
+.mod-card.c1::after{background:linear-gradient(90deg,#FFB500,#E0A000);}
+.mod-card.c2::after{background:linear-gradient(90deg,#64A70B,#4A8008);}
+.mod-card.c3::after{background:linear-gradient(90deg,#2980B9,#1A6090);}
+.mod-card.c4::after{background:linear-gradient(90deg,#8E44AD,#6C3483);}
+.mod-n{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--dim);letter-spacing:2px;}
+.mod-icon{font-size:32px;line-height:1;}
+.mod-name{font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:700;color:var(--text);text-transform:uppercase;line-height:1.05;}
+.mod-desc{font-size:12.5px;color:var(--muted);line-height:1.55;flex:1;}
+.mod-bullets{display:flex;flex-direction:column;gap:5px;}
+.mod-bullet{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--dim);display:flex;gap:7px;align-items:baseline;}
+.mod-bullet::before{content:'›';color:var(--gold);font-size:12px;}
 
-  .nav-title { color: var(--ups-gold); font-family: 'Barlow Condensed', sans-serif; font-size: 14px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; }
-  .nav-btns { display: flex; gap: 6px; }
-  .nav-btn { background: none; border: 1px solid rgba(255,181,0,0.3); color: var(--ups-gold); padding: 4px 12px; border-radius: 4px; font-size: 11px; font-weight: 600; letter-spacing: 1px; cursor: pointer; font-family: 'Barlow Condensed', sans-serif; text-transform: uppercase; transition: all 0.2s; }
-  .nav-btn:hover, .nav-btn.active { background: var(--ups-gold); color: var(--ups-brown-dark); }
-  .slide-counter { color: var(--text-muted); font-size: 12px; font-family: 'IBM Plex Mono', monospace; }
+/* ── S3 OEI ── */
+#s3{background:linear-gradient(150deg,#0D0502 0%,#1A0B04 100%);}
+.s3-inner{position:relative;z-index:2;height:100%;display:flex;flex-direction:column;padding:52px 64px 90px;}
+.formula-bar{display:flex;align-items:stretch;gap:0;margin:28px 0;background:rgba(255,181,0,.04);border:1px solid rgba(255,181,0,.18);border-radius:12px;overflow:hidden;}
+.f-part{flex:1;text-align:center;padding:22px 16px;border-right:1px solid rgba(255,181,0,.12);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;}
+.f-part:last-child{border-right:none;}
+.f-op{flex-shrink:0;display:flex;align-items:center;justify-content:center;padding:0 20px;font-size:36px;color:rgba(255,181,0,.25);font-weight:300;}
+.f-label{font-family:'Barlow Condensed',sans-serif;font-size:12px;letter-spacing:2.5px;text-transform:uppercase;color:var(--muted);}
+.f-val{font-family:'IBM Plex Mono',monospace;font-size:36px;font-weight:600;color:var(--gold);line-height:1;}
+.f-sub{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--dim);}
+.oei-features{display:grid;grid-template-columns:repeat(2,1fr);gap:16px;flex:1;}
+.oei-feat{background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.05);border-radius:10px;padding:22px 24px;display:flex;gap:18px;align-items:flex-start;}
+.oei-feat-ico{width:40px;height:40px;flex-shrink:0;background:rgba(255,181,0,.08);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;}
+.oei-feat h4{font-family:'Barlow Condensed',sans-serif;font-size:17px;font-weight:700;color:var(--text);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;}
+.oei-feat p{font-size:12.5px;color:var(--muted);line-height:1.55;}
 
-  /* ── SLIDE CONTAINER ── */
-  .slide {
-    width: var(--slide-w);
-    height: var(--slide-h);
-    position: relative;
-    overflow: hidden;
-    border-radius: 12px;
-    border: 1px solid rgba(255,181,0,0.15);
-    display: none;
-    flex-direction: column;
-    box-shadow: 0 40px 80px rgba(0,0,0,0.6);
-  }
-  .slide.active { display: flex; }
+/* ── S4 INNOVATIONS ── */
+#s4{background:#0A0400;}
+.s4-inner{position:relative;z-index:2;height:100%;display:flex;flex-direction:column;padding:52px 60px 90px;}
+.nov-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;flex:1;margin-top:28px;}
+.nov-card{background:rgba(255,255,255,.022);border:1px solid rgba(255,255,255,.065);border-radius:12px;padding:26px 22px;display:flex;flex-direction:column;gap:10px;}
+.badge{display:inline-block;font-family:'Barlow Condensed',sans-serif;font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;padding:3px 9px;border-radius:4px;align-self:flex-start;}
+.b-gold{background:rgba(255,181,0,.15);color:var(--gold);border:1px solid rgba(255,181,0,.35);}
+.b-green{background:rgba(100,167,11,.15);color:#64A70B;border:1px solid rgba(100,167,11,.35);}
+.b-blue{background:rgba(41,128,185,.15);color:#5DADE2;border:1px solid rgba(41,128,185,.35);}
+.nov-title{font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:700;color:var(--text);text-transform:uppercase;line-height:1.05;}
+.nov-desc{font-size:12px;color:var(--muted);line-height:1.6;flex:1;}
+.nov-tech{font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:rgba(255,181,0,.4);letter-spacing:.5px;padding-top:8px;border-top:1px solid rgba(255,255,255,.05);}
 
-  /* ── SLIDE BACKGROUNDS ── */
-  .slide-hero { background: var(--ups-brown-dark); }
-  .slide-dark { background: #120804; }
-  .slide-light { background: var(--ups-brown); }
-  .slide-gold { background: linear-gradient(135deg, var(--ups-brown-dark) 0%, #2A1000 100%); }
+/* ── S5 PRIVACY ── */
+#s5{background:linear-gradient(150deg,#060300 0%,#140802 100%);}
+.s5-inner{position:relative;z-index:2;height:100%;display:grid;grid-template-columns:1fr 1fr;}
+.s5-left{padding:60px 56px 100px;display:flex;flex-direction:column;border-right:1px solid rgba(255,181,0,.07);}
+.s5-right{padding:60px 56px 100px;display:flex;flex-direction:column;justify-content:center;}
+.privacy-guarantee{background:rgba(100,167,11,.06);border:1px solid rgba(100,167,11,.22);border-left:3px solid var(--green);border-radius:6px;padding:22px 26px;margin-top:24px;}
+.privacy-guarantee h3{font-family:'Barlow Condensed',sans-serif;font-size:17px;font-weight:700;color:var(--green);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;}
+.privacy-guarantee p{font-size:13px;color:var(--muted);line-height:1.65;}
+.n-badge{display:inline-flex;align-items:center;gap:16px;background:rgba(255,181,0,.08);border:1px solid rgba(255,181,0,.25);border-radius:10px;padding:18px 24px;margin-top:22px;}
+.n-num{font-family:'IBM Plex Mono',monospace;font-size:48px;font-weight:600;color:var(--gold);line-height:1;}
+.n-lbl{font-size:12px;color:var(--muted);line-height:1.5;}
+.n-lbl strong{color:var(--text);}
+.code-box{background:#050200;border:1px solid rgba(255,255,255,.07);border-radius:10px;padding:22px 24px;font-family:'IBM Plex Mono',monospace;font-size:11px;}
+.code-title{font-size:9px;letter-spacing:2px;color:var(--dim);text-transform:uppercase;margin-bottom:16px;border-bottom:1px solid rgba(255,255,255,.05);padding-bottom:10px;}
+.cr{display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.04);}
+.cr:last-child{border:none;}
+.ck{color:var(--dim);}
+.cv-ok{color:var(--gold);}
+.cv-null{color:rgba(192,57,43,.8);background:rgba(192,57,43,.1);padding:1px 7px;border-radius:3px;}
+.cv-true{color:rgba(192,57,43,.7);}
+.divider-row{text-align:center;margin:10px 0;font-size:9px;letter-spacing:2px;color:var(--dim);opacity:.5;}
+.cv-msg{margin-top:12px;font-size:9.5px;color:rgba(192,57,43,.55);line-height:1.5;}
+.layers-row{margin-top:18px;background:rgba(100,167,11,.05);border:1px solid rgba(100,167,11,.18);border-radius:6px;padding:14px 18px;font-size:12px;color:var(--muted);line-height:1.5;}
+.layers-row strong{color:var(--green);}
 
-  /* ── GRID DECORATION ── */
-  .bg-grid {
-    position: absolute;
-    inset: 0;
-    background-image:
-      linear-gradient(rgba(255,181,0,0.04) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(255,181,0,0.04) 1px, transparent 1px);
-    background-size: 40px 40px;
-    pointer-events: none;
-  }
-  .bg-glow {
-    position: absolute;
-    width: 600px;
-    height: 600px;
-    border-radius: 50%;
-    background: radial-gradient(circle, rgba(255,181,0,0.08) 0%, transparent 70%);
-    pointer-events: none;
-  }
+/* ── S6 TECH ── */
+#s6{background:#080401;}
+.s6-inner{position:relative;z-index:2;height:100%;display:flex;flex-direction:column;padding:52px 60px 90px;}
+.arch-row{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;flex:1;margin-top:28px;}
+.arch-col{background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.07);border-radius:10px;padding:20px 18px;display:flex;flex-direction:column;gap:10px;overflow:hidden;}
+.arch-col-hd{font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;padding-bottom:10px;border-bottom:1px solid rgba(255,255,255,.06);}
+.ai{font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:var(--muted);display:flex;gap:7px;align-items:baseline;line-height:1.4;}
+.ai::before{content:'▸';color:var(--gold);font-size:9px;flex-shrink:0;}
+.tech-pills{display:flex;flex-wrap:wrap;gap:6px;margin-top:18px;}
+.tp{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);color:var(--muted);padding:4px 12px;border-radius:5px;font-family:'IBM Plex Mono',monospace;font-size:10.5px;}
+.tp.hi{border-color:rgba(255,181,0,.3);color:var(--gold);background:rgba(255,181,0,.06);}
 
-  /* ── SLIDE HEADER BAR ── */
-  .slide-topbar {
-    position: absolute;
-    top: 0; left: 0; right: 0;
-    height: 4px;
-    background: linear-gradient(90deg, var(--ups-gold) 0%, var(--ups-gold-dim) 60%, transparent 100%);
-  }
+/* ── S7 IMPACT ── */
+#s7{background:linear-gradient(150deg,#0C0501 0%,#180A02 100%);}
+.s7-inner{position:relative;z-index:2;height:100%;display:flex;flex-direction:column;padding:52px 60px 90px;}
+.impact-3{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-top:24px;}
+.imp-c{background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.07);border-radius:12px;padding:28px 22px;text-align:center;}
+.imp-n{font-family:'Barlow Condensed',sans-serif;font-size:64px;font-weight:900;color:var(--gold);line-height:1;}
+.imp-u{font-size:32px;}
+.imp-l{font-size:12.5px;color:var(--muted);margin-top:8px;line-height:1.45;}
+.req-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:20px;flex:1;}
+.req{display:flex;gap:12px;align-items:flex-start;font-size:13px;color:var(--muted);}
+.req .ck{color:var(--green);flex-shrink:0;font-size:15px;margin-top:1px;}
+.req .ck.gold{color:var(--gold);}
+.req strong{color:var(--text);}
 
-  /* ── SLIDE FOOTER ── */
-  .slide-footer {
-    position: absolute;
-    bottom: 0; left: 0; right: 0;
-    height: 36px;
-    background: rgba(0,0,0,0.4);
-    border-top: 1px solid rgba(255,181,0,0.1);
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0 32px;
-  }
-  .slide-footer span {
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 10px;
-    color: rgba(255,181,0,0.4);
-    letter-spacing: 1px;
-    text-transform: uppercase;
-  }
-
-  /* ── LOGO MARK ── */
-  .ups-shield {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 40px; height: 48px;
-    background: var(--ups-gold);
-    border-radius: 4px 4px 20px 20px;
-    clip-path: polygon(0 0, 100% 0, 100% 70%, 50% 100%, 0 70%);
-    font-family: 'Barlow Condensed', sans-serif;
-    font-size: 15px;
-    font-weight: 900;
-    color: var(--ups-brown-dark);
-    letter-spacing: -0.5px;
-  }
-
-  /* ── EYEBROW ── */
-  .eyebrow {
-    font-family: 'Barlow Condensed', sans-serif;
-    font-size: 11px;
-    font-weight: 700;
-    letter-spacing: 3px;
-    text-transform: uppercase;
-    color: var(--ups-gold);
-    opacity: 0.8;
-  }
-
-  /* ── HERO SLIDE (1) ── */
-  .hero-content {
-    position: relative;
-    z-index: 2;
-    display: flex;
-    height: 100%;
-    align-items: center;
-    padding: 0 80px;
-    gap: 80px;
-  }
-  .hero-left { flex: 1; }
-  .hero-right {
-    width: 340px;
-    height: 340px;
-    position: relative;
-    flex-shrink: 0;
-  }
-  .hero-orb {
-    width: 100%;
-    height: 100%;
-    border-radius: 50%;
-    background: radial-gradient(circle at 40% 40%, rgba(255,181,0,0.15), rgba(255,181,0,0.03) 60%, transparent);
-    border: 1px solid rgba(255,181,0,0.2);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    position: relative;
-  }
-  .hero-orb::before {
-    content: '';
-    position: absolute;
-    width: 80%;
-    height: 80%;
-    border-radius: 50%;
-    border: 1px solid rgba(255,181,0,0.1);
-  }
-  .hero-orb::after {
-    content: '';
-    position: absolute;
-    width: 60%;
-    height: 60%;
-    border-radius: 50%;
-    border: 1px solid rgba(255,181,0,0.1);
-  }
-  .oei-display {
-    text-align: center;
-    position: relative;
-    z-index: 1;
-  }
-  .oei-formula {
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 11px;
-    color: var(--text-muted);
-    line-height: 2;
-  }
-  .oei-score {
-    font-family: 'Barlow Condensed', sans-serif;
-    font-size: 72px;
-    font-weight: 900;
-    color: var(--ups-gold);
-    line-height: 1;
-  }
-  .oei-label { font-family: 'Barlow Condensed', sans-serif; font-size: 13px; letter-spacing: 3px; color: var(--text-muted); text-transform: uppercase; margin-top: 4px; }
-  .hero-title {
-    font-family: 'Barlow Condensed', sans-serif;
-    font-size: 72px;
-    font-weight: 900;
-    line-height: 0.9;
-    color: var(--text-light);
-    text-transform: uppercase;
-    margin: 16px 0 8px;
-  }
-  .hero-title .gold { color: var(--ups-gold); }
-  .hero-subtitle {
-    font-size: 16px;
-    color: var(--text-muted);
-    line-height: 1.6;
-    max-width: 480px;
-    margin: 20px 0 36px;
-  }
-  .hero-tags { display: flex; gap: 8px; flex-wrap: wrap; }
-  .tag {
-    background: rgba(255,181,0,0.1);
-    border: 1px solid rgba(255,181,0,0.3);
-    color: var(--ups-gold);
-    padding: 4px 12px;
-    border-radius: 100px;
-    font-size: 11px;
-    font-weight: 600;
-    letter-spacing: 1px;
-    text-transform: uppercase;
-    font-family: 'Barlow Condensed', sans-serif;
-  }
-
-  /* ── PROBLEM SLIDE (2) ── */
-  .problem-layout {
-    position: relative; z-index: 2;
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    height: 100%;
-    padding: 48px 56px;
-    gap: 48px;
-  }
-  .problem-left {}
-  .problem-right {}
-  .slide-section-title {
-    font-family: 'Barlow Condensed', sans-serif;
-    font-size: 44px;
-    font-weight: 800;
-    line-height: 1;
-    color: var(--text-light);
-    text-transform: uppercase;
-    margin: 10px 0 24px;
-  }
-  .slide-section-title .gold { color: var(--ups-gold); }
-  .pain-item {
-    display: flex;
-    gap: 14px;
-    margin-bottom: 16px;
-    align-items: flex-start;
-  }
-  .pain-icon {
-    width: 28px; height: 28px;
-    border-radius: 6px;
-    background: rgba(192,57,43,0.2);
-    border: 1px solid rgba(192,57,43,0.4);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 13px;
-    flex-shrink: 0;
-    margin-top: 1px;
-  }
-  .pain-text {
-    font-size: 14px;
-    color: var(--text-muted);
-    line-height: 1.5;
-  }
-  .pain-text strong { color: var(--text-light); font-weight: 600; }
-  .quote-box {
-    background: rgba(255,181,0,0.06);
-    border: 1px solid rgba(255,181,0,0.2);
-    border-left: 3px solid var(--ups-gold);
-    border-radius: 4px;
-    padding: 20px 24px;
-    margin-top: 24px;
-  }
-  .quote-box p {
-    font-size: 15px;
-    color: var(--text-light);
-    font-style: italic;
-    line-height: 1.6;
-  }
-  .quote-source {
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 10px;
-    color: var(--ups-gold);
-    letter-spacing: 1px;
-    margin-top: 10px;
-    text-transform: uppercase;
-  }
-  .stat-row { display: flex; gap: 20px; margin-top: 28px; }
-  .stat-card {
-    flex: 1;
-    background: rgba(255,255,255,0.03);
-    border: 1px solid rgba(255,255,255,0.08);
-    border-radius: 8px;
-    padding: 16px;
-    text-align: center;
-  }
-  .stat-number {
-    font-family: 'Barlow Condensed', sans-serif;
-    font-size: 36px;
-    font-weight: 800;
-    color: var(--ups-gold);
-  }
-  .stat-label {
-    font-size: 11px;
-    color: var(--text-muted);
-    margin-top: 4px;
-    line-height: 1.4;
-  }
-
-  /* ── SOLUTION SLIDE (3) ── */
-  .modules-layout {
-    position: relative; z-index: 2;
-    padding: 40px 56px;
-    height: 100%;
-    display: flex;
-    flex-direction: column;
-  }
-  .modules-grid {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 16px;
-    flex: 1;
-    margin-top: 28px;
-  }
-  .module-card {
-    background: rgba(255,255,255,0.03);
-    border: 1px solid rgba(255,255,255,0.08);
-    border-radius: 10px;
-    padding: 24px 20px;
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-    position: relative;
-    overflow: hidden;
-    transition: all 0.2s;
-  }
-  .module-card::before {
-    content: '';
-    position: absolute;
-    top: 0; left: 0; right: 0;
-    height: 2px;
-  }
-  .module-card.m1::before { background: #FFB500; }
-  .module-card.m2::before { background: #64A70B; }
-  .module-card.m3::before { background: #2980B9; }
-  .module-card.m4::before { background: #8E44AD; }
-  .module-num {
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 10px;
-    color: var(--text-muted);
-    letter-spacing: 2px;
-  }
-  .module-icon { font-size: 28px; line-height: 1; }
-  .module-name {
-    font-family: 'Barlow Condensed', sans-serif;
-    font-size: 20px;
-    font-weight: 700;
-    color: var(--text-light);
-    text-transform: uppercase;
-    line-height: 1.1;
-  }
-  .module-desc {
-    font-size: 12px;
-    color: var(--text-muted);
-    line-height: 1.5;
-    flex: 1;
-  }
-  .module-pills { display: flex; flex-direction: column; gap: 4px; }
-  .module-pill {
-    font-size: 10px;
-    font-family: 'IBM Plex Mono', monospace;
-    color: var(--text-muted);
-    display: flex;
-    align-items: center;
-    gap: 6px;
-  }
-  .module-pill::before { content: '›'; color: var(--ups-gold); font-size: 12px; }
-
-  /* ── OEI SLIDE (4) ── */
-  .oei-layout {
-    position: relative; z-index: 2;
-    height: 100%;
-    padding: 40px 56px;
-    display: flex;
-    flex-direction: column;
-  }
-  .oei-formula-display {
-    display: flex;
-    align-items: center;
-    gap: 20px;
-    margin: 24px 0;
-    padding: 24px;
-    background: rgba(255,181,0,0.05);
-    border: 1px solid rgba(255,181,0,0.2);
-    border-radius: 10px;
-  }
-  .formula-part {
-    text-align: center;
-    flex: 1;
-  }
-  .formula-part .label {
-    font-family: 'Barlow Condensed', sans-serif;
-    font-size: 13px;
-    letter-spacing: 2px;
-    color: var(--text-muted);
-    text-transform: uppercase;
-  }
-  .formula-part .value {
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 26px;
-    font-weight: 600;
-    color: var(--ups-gold);
-    margin: 4px 0;
-    line-height: 1;
-  }
-  .formula-part .sub {
-    font-size: 10px;
-    color: var(--text-muted);
-    font-family: 'IBM Plex Mono', monospace;
-  }
-  .formula-op {
-    font-size: 32px;
-    color: rgba(255,181,0,0.4);
-    font-weight: 300;
-  }
-  .oei-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 16px;
-    flex: 1;
-    margin-top: 16px;
-  }
-  .oei-feature {
-    background: rgba(255,255,255,0.02);
-    border: 1px solid rgba(255,255,255,0.06);
-    border-radius: 8px;
-    padding: 20px;
-    display: flex;
-    gap: 16px;
-    align-items: flex-start;
-  }
-  .oei-feature-icon {
-    width: 36px; height: 36px;
-    background: rgba(255,181,0,0.1);
-    border-radius: 8px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 16px;
-    flex-shrink: 0;
-  }
-  .oei-feature-text h4 {
-    font-family: 'Barlow Condensed', sans-serif;
-    font-size: 16px;
-    font-weight: 700;
-    color: var(--text-light);
-    text-transform: uppercase;
-    margin-bottom: 4px;
-  }
-  .oei-feature-text p {
-    font-size: 12px;
-    color: var(--text-muted);
-    line-height: 1.5;
-  }
-
-  /* ── NOVELTY SLIDE (5) ── */
-  .novelty-layout {
-    position: relative; z-index: 2;
-    height: 100%;
-    padding: 40px 56px;
-    display: flex;
-    flex-direction: column;
-  }
-  .novelty-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 16px;
-    flex: 1;
-    margin-top: 24px;
-  }
-  .novelty-card {
-    background: rgba(255,255,255,0.025);
-    border: 1px solid rgba(255,255,255,0.07);
-    border-radius: 10px;
-    padding: 22px 20px;
-    position: relative;
-    overflow: hidden;
-  }
-  .novelty-badge {
-    display: inline-block;
-    font-size: 9px;
-    font-family: 'Barlow Condensed', sans-serif;
-    letter-spacing: 2px;
-    font-weight: 700;
-    text-transform: uppercase;
-    padding: 2px 8px;
-    border-radius: 3px;
-    margin-bottom: 12px;
-  }
-  .badge-gold { background: rgba(255,181,0,0.2); color: var(--ups-gold); border: 1px solid rgba(255,181,0,0.4); }
-  .badge-green { background: rgba(100,167,11,0.2); color: #64A70B; border: 1px solid rgba(100,167,11,0.4); }
-  .badge-blue { background: rgba(41,128,185,0.2); color: #5DADE2; border: 1px solid rgba(41,128,185,0.4); }
-  .novelty-title {
-    font-family: 'Barlow Condensed', sans-serif;
-    font-size: 19px;
-    font-weight: 700;
-    color: var(--text-light);
-    text-transform: uppercase;
-    line-height: 1.1;
-    margin-bottom: 8px;
-  }
-  .novelty-desc {
-    font-size: 12px;
-    color: var(--text-muted);
-    line-height: 1.6;
-  }
-  .novelty-tech {
-    margin-top: 12px;
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 10px;
-    color: rgba(255,181,0,0.5);
-    letter-spacing: 1px;
-  }
-
-  /* ── PRIVACY SLIDE (6) ── */
-  .privacy-layout {
-    position: relative; z-index: 2;
-    height: 100%;
-    padding: 40px 56px;
-    display: flex;
-    gap: 56px;
-  }
-  .privacy-left { flex: 1; display: flex; flex-direction: column; }
-  .privacy-right { width: 440px; display: flex; flex-direction: column; justify-content: center; }
-  .privacy-guarantee {
-    background: rgba(100,167,11,0.06);
-    border: 1px solid rgba(100,167,11,0.25);
-    border-left: 3px solid #64A70B;
-    border-radius: 4px;
-    padding: 20px 24px;
-    margin-top: 20px;
-  }
-  .privacy-guarantee h3 {
-    font-family: 'Barlow Condensed', sans-serif;
-    font-size: 18px;
-    font-weight: 700;
-    color: #64A70B;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-    margin-bottom: 8px;
-  }
-  .privacy-guarantee p {
-    font-size: 13px;
-    color: var(--text-muted);
-    line-height: 1.6;
-  }
-  .redacted-demo {
-    background: rgba(0,0,0,0.4);
-    border: 1px solid rgba(255,255,255,0.08);
-    border-radius: 8px;
-    padding: 20px;
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 11px;
-  }
-  .redacted-row {
-    display: flex;
-    justify-content: space-between;
-    padding: 6px 0;
-    border-bottom: 1px solid rgba(255,255,255,0.05);
-    align-items: center;
-  }
-  .redacted-row:last-child { border-bottom: none; }
-  .redact-key { color: var(--text-muted); }
-  .redact-value-ok { color: var(--ups-gold); }
-  .redact-value-null { color: rgba(192,57,43,0.7); background: rgba(192,57,43,0.1); padding: 1px 6px; border-radius: 2px; }
-  .redact-msg { font-size: 9px; color: rgba(192,57,43,0.6); margin-top: 10px; line-height: 1.4; }
-  .privacy-n-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 10px;
-    background: rgba(255,181,0,0.1);
-    border: 1px solid rgba(255,181,0,0.3);
-    border-radius: 8px;
-    padding: 14px 20px;
-    margin-top: 20px;
-  }
-  .n-number {
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 40px;
-    font-weight: 600;
-    color: var(--ups-gold);
-    line-height: 1;
-  }
-  .n-label { font-size: 12px; color: var(--text-muted); line-height: 1.4; }
-
-  /* ── ARCHITECTURE SLIDE (7) ── */
-  .arch-layout {
-    position: relative; z-index: 2;
-    height: 100%;
-    padding: 40px 56px;
-    display: flex;
-    flex-direction: column;
-  }
-  .arch-flow {
-    display: flex;
-    align-items: center;
-    gap: 0;
-    margin-top: 28px;
-    flex: 1;
-  }
-  .arch-box {
-    flex: 1;
-    background: rgba(255,255,255,0.03);
-    border: 1px solid rgba(255,255,255,0.08);
-    border-radius: 8px;
-    padding: 16px 14px;
-    display: flex;
-    flex-direction: column;
-    height: 100%;
-    gap: 8px;
-  }
-  .arch-box-title {
-    font-family: 'Barlow Condensed', sans-serif;
-    font-size: 14px;
-    font-weight: 700;
-    color: var(--text-light);
-    text-transform: uppercase;
-    letter-spacing: 1px;
-    padding-bottom: 8px;
-    border-bottom: 1px solid rgba(255,255,255,0.06);
-  }
-  .arch-item {
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 10px;
-    color: var(--text-muted);
-    display: flex;
-    gap: 6px;
-    align-items: center;
-  }
-  .arch-item::before { content: '▸'; color: var(--ups-gold); font-size: 9px; flex-shrink: 0; }
-  .arch-arrow {
-    flex-shrink: 0;
-    color: rgba(255,181,0,0.3);
-    font-size: 20px;
-    margin: 0 4px;
-  }
-  .tech-pills {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-    margin-top: 20px;
-  }
-  .tech-pill {
-    background: rgba(255,255,255,0.04);
-    border: 1px solid rgba(255,255,255,0.08);
-    color: var(--text-muted);
-    padding: 3px 10px;
-    border-radius: 4px;
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 10px;
-    letter-spacing: 0.5px;
-  }
-  .tech-pill.highlight { border-color: rgba(255,181,0,0.3); color: var(--ups-gold); background: rgba(255,181,0,0.06); }
-
-  /* ── IMPACT SLIDE (8) ── */
-  .impact-layout {
-    position: relative; z-index: 2;
-    height: 100%;
-    padding: 40px 56px;
-    display: flex;
-    flex-direction: column;
-  }
-  .impact-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 16px;
-    margin-top: 24px;
-  }
-  .impact-card {
-    background: rgba(255,255,255,0.03);
-    border: 1px solid rgba(255,255,255,0.07);
-    border-radius: 10px;
-    padding: 24px 20px;
-    text-align: center;
-  }
-  .impact-number {
-    font-family: 'Barlow Condensed', sans-serif;
-    font-size: 52px;
-    font-weight: 900;
-    color: var(--ups-gold);
-    line-height: 1;
-  }
-  .impact-unit { font-size: 22px; }
-  .impact-label {
-    font-size: 12px;
-    color: var(--text-muted);
-    margin-top: 6px;
-    line-height: 1.4;
-  }
-  .impact-checklist {
-    margin-top: 20px;
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 10px;
-  }
-  .check-item {
-    display: flex;
-    gap: 10px;
-    align-items: flex-start;
-    font-size: 13px;
-    color: var(--text-muted);
-  }
-  .check-item .check { color: #64A70B; flex-shrink: 0; font-size: 15px; }
-  .check-item strong { color: var(--text-light); }
-
-  /* ── CLOSING SLIDE (9) ── */
-  .closing-content {
-    position: relative; z-index: 2;
-    height: 100%;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    text-align: center;
-    padding: 56px;
-  }
-  .closing-tagline {
-    font-family: 'Barlow Condensed', sans-serif;
-    font-size: 64px;
-    font-weight: 900;
-    line-height: 0.95;
-    text-transform: uppercase;
-    color: var(--text-light);
-    margin: 16px 0;
-  }
-  .closing-tagline .gold { color: var(--ups-gold); }
-  .closing-sub {
-    font-size: 16px;
-    color: var(--text-muted);
-    max-width: 560px;
-    line-height: 1.7;
-    margin: 20px 0 36px;
-  }
-  .closing-cta-row { display: flex; gap: 16px; }
-  .btn-primary {
-    background: var(--ups-gold);
-    color: var(--ups-brown-dark);
-    padding: 12px 32px;
-    border-radius: 6px;
-    font-family: 'Barlow Condensed', sans-serif;
-    font-weight: 700;
-    font-size: 16px;
-    letter-spacing: 1px;
-    text-transform: uppercase;
-    text-decoration: none;
-    cursor: pointer;
-    border: none;
-  }
-  .btn-ghost {
-    background: transparent;
-    color: var(--ups-gold);
-    padding: 12px 32px;
-    border-radius: 6px;
-    font-family: 'Barlow Condensed', sans-serif;
-    font-weight: 700;
-    font-size: 16px;
-    letter-spacing: 1px;
-    text-transform: uppercase;
-    text-decoration: none;
-    cursor: pointer;
-    border: 1px solid rgba(255,181,0,0.4);
-  }
-
-  /* ── COMPLIANCE CHECK SLIDE (bonus) ── */
-  .compliance-layout {
-    position: relative; z-index: 2;
-    height: 100%;
-    padding: 40px 56px;
-    display: flex;
-    gap: 48px;
-  }
-  .compliance-left { flex: 1; }
-  .compliance-right { flex: 1; }
-  .compliance-table { width: 100%; margin-top: 20px; border-collapse: collapse; }
-  .compliance-table th {
-    font-family: 'Barlow Condensed', sans-serif;
-    font-size: 12px;
-    letter-spacing: 1.5px;
-    text-transform: uppercase;
-    color: var(--text-muted);
-    padding: 8px 12px;
-    text-align: left;
-    border-bottom: 1px solid rgba(255,255,255,0.08);
-  }
-  .compliance-table td {
-    padding: 10px 12px;
-    font-size: 12px;
-    color: var(--text-muted);
-    border-bottom: 1px solid rgba(255,255,255,0.04);
-  }
-  .compliance-table td:first-child { color: var(--text-light); font-weight: 500; }
-  .tick { color: #64A70B; }
-  .cross { color: #C0392B; }
-  .partial { color: var(--ups-gold); }
-
+/* ── S8 CLOSING ── */
+#s8{background:linear-gradient(135deg,#100500 0%,#1E0900 50%,#120500 100%);}
+.s8-inner{position:relative;z-index:2;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:60px 80px 100px;}
+.closing-title{font-family:'Barlow Condensed',sans-serif;font-size:clamp(56px,7vw,96px);font-weight:900;line-height:.9;text-transform:uppercase;color:var(--text);margin:18px 0;}
+.closing-title .g{color:var(--gold);}
+.closing-sub{font-size:17px;color:var(--muted);max-width:640px;line-height:1.7;margin:20px auto 40px;}
+.closing-sub strong{color:var(--gold);}
+.cta-row{display:flex;gap:16px;align-items:center;}
+.btn-p{background:var(--gold);color:var(--brown);padding:14px 36px;border-radius:8px;font-family:'Barlow Condensed',sans-serif;font-size:17px;font-weight:700;letter-spacing:1px;text-transform:uppercase;text-decoration:none;}
+.btn-g{background:transparent;color:var(--gold);padding:14px 36px;border-radius:8px;font-family:'Barlow Condensed',sans-serif;font-size:17px;font-weight:700;letter-spacing:1px;text-transform:uppercase;text-decoration:none;border:1px solid rgba(255,181,0,.35);}
+.metrics-row{display:flex;gap:60px;margin-top:44px;opacity:.5;}
+.m-item{text-align:center;}
+.m-n{font-family:'Barlow Condensed',sans-serif;font-size:38px;font-weight:800;color:var(--text);line-height:1;}
+.m-l{font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:2px;color:var(--gold);text-transform:uppercase;margin-top:4px;}
 </style>
 </head>
 <body>
+<div class="deck">
 
-<!-- NAV CONTROLS -->
-<div class="nav">
-  <span class="nav-title">⬡ SYNAPSE OPS — PITCH DECK</span>
-  <div class="nav-btns">
-    <button class="nav-btn active" onclick="goTo(0)">01</button>
-    <button class="nav-btn" onclick="goTo(1)">02</button>
-    <button class="nav-btn" onclick="goTo(2)">03</button>
-    <button class="nav-btn" onclick="goTo(3)">04</button>
-    <button class="nav-btn" onclick="goTo(4)">05</button>
-    <button class="nav-btn" onclick="goTo(5)">06</button>
-    <button class="nav-btn" onclick="goTo(6)">07</button>
-    <button class="nav-btn" onclick="goTo(7)">08</button>
-    <button class="nav-btn" onclick="goTo(8)">09</button>
-  </div>
-  <span class="slide-counter" id="counter">SLIDE 01 / 09</span>
-</div>
-
-<!-- ═══════════════════════════════════ SLIDE 1 — HERO ═══════════════════════════════════ -->
-<div class="slide slide-hero active" id="slide-0">
-  <div class="bg-grid"></div>
-  <div class="bg-glow" style="top:-200px;right:-100px;"></div>
-  <div class="slide-topbar"></div>
-
-  <div class="hero-content">
-    <div class="hero-left">
-      <div style="display:flex;align-items:center;gap:14px;margin-bottom:8px;">
-        <div class="ups-shield">ups</div>
-        <span class="eyebrow">UPS Ground Hub Services · Logistics Operations Excellence</span>
+<!-- SLIDE 1 HERO -->
+<div class="slide active" id="s0">
+  <div class="accent-line"></div><div class="bg-grid"></div>
+  <div class="bg-radial" style="width:700px;height:700px;top:-200px;right:-100px;"></div>
+  <div class="slide-num">01 / 09</div>
+  <div class="s0-inner">
+    <div class="s0-left">
+      <div style="display:flex;align-items:center;gap:14px;">
+        <div class="shield">ups</div>
+        <span class="eyebrow">UPS Ground Hub Services &middot; Logistics Operations Excellence</span>
       </div>
-      <div class="hero-title">
-        SYNAPSE<br><span class="gold">OPS</span>
-      </div>
-      <div class="hero-subtitle">
-        The first unified intelligence platform that defines, measures, and optimizes operational excellence across every UPS hub process — from dock to delivery.
-      </div>
+      <div class="hero-title">SYNAPSE<br><span class="g">OPS</span></div>
+      <div class="hero-sub">A unified intelligence platform that defines, measures, and optimizes operational excellence across every UPS hub process &mdash; from dock to last-mile delivery.</div>
       <div class="hero-tags">
-        <span class="tag">📊 Volume Forecasting</span>
-        <span class="tag">👥 Workforce Planning</span>
-        <span class="tag">⚡ OEI Engine</span>
-        <span class="tag">🔧 Resource Optimization</span>
-        <span class="tag">🤖 AI Copilot</span>
-        <span class="tag">🛡 Privacy-Safe</span>
+        <span class="tag">&#128200; Volume Forecasting</span>
+        <span class="tag">&#128119; Workforce Planning</span>
+        <span class="tag">&#9889; OEI Engine</span>
+        <span class="tag">&#128295; Resource Optimization</span>
+        <span class="tag">&#129504; AI Copilot</span>
+        <span class="tag">&#128737; Privacy Guaranteed</span>
       </div>
     </div>
-    <div class="hero-right">
-      <div class="hero-orb">
-        <div class="oei-display">
-          <div class="oei-score">OEI</div>
-          <div class="oei-label">Ops Efficiency Index</div>
-          <div class="oei-formula" style="margin-top:10px;">
-            T.Ratio × Q.Ratio × U.Ratio<br>
-            <span style="color:var(--ups-gold)">The Yardstick UPS Never Had</span>
-          </div>
+    <div class="s0-right">
+      <div class="oei-ring">
+        <div class="orbit-dot" style="top:14%;left:50%;transform:translateX(-50%);"></div>
+        <div class="orbit-dot" style="bottom:14%;left:50%;transform:translateX(-50%);width:5px;height:5px;opacity:.5;"></div>
+        <div class="orbit-dot" style="top:50%;right:10%;transform:translateY(-50%);width:5px;height:5px;opacity:.6;"></div>
+        <div class="oei-center">
+          <div class="oei-big">OEI</div>
+          <div class="oei-caption">Ops Efficiency Index</div>
+          <div class="oei-formula">T.Ratio &times; Q.Ratio &times; U.Ratio<br><span>The Yardstick UPS Never Had</span></div>
         </div>
       </div>
     </div>
   </div>
-
-  <div class="slide-footer">
-    <span>UPS SYNAPSE OPS — CONFIDENTIAL</span>
-    <span>LOGISTICS OPERATIONS EXCELLENCE · PREDICTIVE ANALYTICS & RESOURCE OPTIMIZATION</span>
-    <span>01 / 09</span>
-  </div>
+  <div class="slide-footer"><span>UPS Synapse Ops &mdash; Confidential</span><span>Logistics Operations Excellence &middot; Predictive Analytics &amp; Resource Optimization</span></div>
 </div>
 
-<!-- ═══════════════════════════════════ SLIDE 2 — PROBLEM ═══════════════════════════════════ -->
-<div class="slide slide-dark" id="slide-1">
-  <div class="bg-grid"></div>
-  <div class="slide-topbar"></div>
-
-  <div class="problem-layout">
-    <div class="problem-left">
-      <div class="eyebrow">The Problem</div>
-      <div class="slide-section-title">A <span class="gold">$94B</span><br>Blind Spot</div>
-
-      <div class="pain-item">
-        <div class="pain-icon">❌</div>
-        <div class="pain-text"><strong>No Measurable Yardstick.</strong> No standardized mechanism to measure operational effectiveness across inbound, outbound, and inventory functions.</div>
-      </div>
-      <div class="pain-item">
-        <div class="pain-icon">❌</div>
-        <div class="pain-text"><strong>Zero Forecasting Capability.</strong> No reliable system to predict inbound/outbound workload volumes — managers plan by intuition alone.</div>
-      </div>
-      <div class="pain-item">
-        <div class="pain-icon">❌</div>
-        <div class="pain-text"><strong>Reactive, Not Proactive.</strong> Resource planning responds to crises rather than anticipating them. Capacity misalignment costs millions annually.</div>
-      </div>
-      <div class="pain-item">
-        <div class="pain-icon">❌</div>
-        <div class="pain-text"><strong>Workforce Blindness.</strong> Difficulty estimating manpower from projected workload. Understaffed shifts → SLA breaches. Overstaffed shifts → wasted labor cost.</div>
-      </div>
-      <div class="pain-item">
-        <div class="pain-icon">❌</div>
-        <div class="pain-text"><strong>Limited Productivity Visibility.</strong> No visibility into real-time operational trends per zone, process, or shift level.</div>
+<!-- SLIDE 2 PROBLEM -->
+<div class="slide" id="s1">
+  <div class="accent-line"></div><div class="bg-grid"></div>
+  <div class="slide-num">02 / 09</div>
+  <div class="s1-inner">
+    <div class="s1-left">
+      <div class="eyebrow">The Challenge</div>
+      <div class="sec-title">A <span class="g">$94B</span><br>Operational<br>Blind Spot</div>
+      <div class="pain-list">
+        <div class="pain"><div class="pain-dot"></div><div class="pain-body"><strong>No Measurable Yardstick.</strong> Zero standardized mechanism to measure operational effectiveness across inbound, outbound, and inventory functions.</div></div>
+        <div class="pain"><div class="pain-dot"></div><div class="pain-body"><strong>No Forecasting Capability.</strong> No reliable system to predict inbound/outbound workload volumes &mdash; managers plan on intuition alone.</div></div>
+        <div class="pain"><div class="pain-dot"></div><div class="pain-body"><strong>Reactive Planning.</strong> Resource allocation responds to crises rather than anticipating them. Capacity misalignment costs millions annually.</div></div>
+        <div class="pain"><div class="pain-dot"></div><div class="pain-body"><strong>Workforce Blindness.</strong> Difficulty estimating manpower from projected workload. Understaffed &rarr; SLA breaches. Overstaffed &rarr; wasted labor cost.</div></div>
+        <div class="pain"><div class="pain-dot"></div><div class="pain-body"><strong>No Productivity Visibility.</strong> No real-time insight into performance per zone, process, or shift across the hub floor.</div></div>
       </div>
     </div>
-
-    <div class="problem-right">
-      <div class="quote-box">
+    <div class="s1-right">
+      <div class="quote-block">
         <p>"Operational leaders lack actionable insights for capacity planning, efficiency monitoring, and resource allocation."</p>
-        <div class="quote-source">— UPS Problem Statement, SPOC: Sivakumar Kaliappan</div>
+        <div class="quote-src">&mdash; UPS Problem Statement &middot; SPOC: Sivakumar Kaliappan</div>
       </div>
-
-      <div class="stat-row">
-        <div class="stat-card">
-          <div class="stat-number">6</div>
-          <div class="stat-label">Core operational challenges UPS identified</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-number">0</div>
-          <div class="stat-label">Existing standardized KPI frameworks in place</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-number">∞</div>
-          <div class="stat-label">Opportunity for the team that defines the yardstick first</div>
-        </div>
+      <div class="stat-trio" style="margin-top:24px;">
+        <div class="stat-c"><div class="stat-n">6</div><div class="stat-l">Core challenges identified in problem statement</div></div>
+        <div class="stat-c"><div class="stat-n">0</div><div class="stat-l">Existing standardized KPI frameworks in place</div></div>
+        <div class="stat-c"><div class="stat-n">&#8734;</div><div class="stat-l">Opportunity for the team that defines the yardstick first</div></div>
       </div>
-
-      <div style="margin-top:20px;background:rgba(255,181,0,0.06);border:1px solid rgba(255,181,0,0.2);border-radius:8px;padding:18px;">
-        <div style="font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:700;color:var(--ups-gold);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">Challenge #1 is the Headline</div>
-        <div style="font-size:13px;color:var(--text-muted);line-height:1.6;">Manufacturing has OEE. Retail has GMROI. Warehouses have <em style="color:var(--text-light)">nothing</em>. Our primary deliverable is not ML — it is the <strong style="color:var(--ups-gold)">Ops Efficiency Index (OEI)</strong>: a single, comparable number every hub manager can act on.</div>
+      <div class="headline-box" style="margin-top:22px;">
+        <h3>&#128205; Challenge #1 Is the Headline</h3>
+        <p>Manufacturing has OEE. Retail has GMROI. Warehouses have <em>nothing</em>. Our primary deliverable is not ML &mdash; it is the <strong>Ops Efficiency Index (OEI)</strong>: a single comparable number every hub manager can act on today.</p>
       </div>
     </div>
   </div>
-
-  <div class="slide-footer">
-    <span>UPS SYNAPSE OPS — CONFIDENTIAL</span>
-    <span>PROBLEM STATEMENT — LOGISTICS OPERATIONS EXCELLENCE</span>
-    <span>02 / 09</span>
-  </div>
+  <div class="slide-footer"><span>UPS Synapse Ops &mdash; Confidential</span><span>Problem Statement &middot; Logistics Operations Excellence</span></div>
 </div>
 
-<!-- ═══════════════════════════════════ SLIDE 3 — SOLUTION OVERVIEW ═══════════════════════════════════ -->
-<div class="slide slide-dark" id="slide-2">
-  <div class="bg-grid"></div>
-  <div class="slide-topbar"></div>
-
-  <div class="modules-layout">
+<!-- SLIDE 3 MODULES -->
+<div class="slide" id="s2">
+  <div class="accent-line"></div><div class="bg-grid"></div>
+  <div class="slide-num">03 / 09</div>
+  <div class="s2-inner">
     <div>
       <div class="eyebrow">Our Solution</div>
-      <div class="slide-section-title" style="font-size:36px;">Four Modules. <span class="gold">One Unified Platform.</span></div>
+      <div class="sec-title" style="font-size:52px;">Four Modules. <span class="g">One Platform.</span></div>
     </div>
-
     <div class="modules-grid">
-      <div class="module-card m1">
-        <div class="module-num">MODULE 01</div>
-        <div class="module-icon">📈</div>
-        <div class="module-name">Volume<br>Forecasting</div>
-        <div class="module-desc">LightGBM quantile regression delivering P10/P50/P90 fan-chart forecasts for inbound shipments, outbound orders, and inventory movements.</div>
-        <div class="module-pills">
-          <div class="module-pill">Hourly / Daily / Weekly horizons</div>
-          <div class="module-pill">Weather & holiday integration</div>
-          <div class="module-pill">WAPE accuracy backtest vs baseline</div>
-          <div class="module-pill">SHAP driver explainability</div>
+      <div class="mod-card c1">
+        <div class="mod-n">MODULE 01</div><div class="mod-icon">&#128200;</div>
+        <div class="mod-name">Volume<br>Forecasting</div>
+        <div class="mod-desc">LightGBM quantile regression delivering P10/P50/P90 fan-chart forecasts for inbound shipments, outbound orders, and inventory movements across all time horizons.</div>
+        <div class="mod-bullets">
+          <div class="mod-bullet">Hourly / Daily / Weekly horizons</div>
+          <div class="mod-bullet">Weather &amp; holiday integration</div>
+          <div class="mod-bullet">WAPE accuracy backtest vs baseline</div>
+          <div class="mod-bullet">SHAP driver explainability panel</div>
         </div>
       </div>
-
-      <div class="module-card m2">
-        <div class="module-num">MODULE 02</div>
-        <div class="module-icon">👷</div>
-        <div class="module-name">Smart Workforce<br>Planning</div>
-        <div class="module-desc">Converts volume forecasts → required labor hours → shift headcount using OR-Tools CP-SAT constraint solver with real labor rules.</div>
-        <div class="module-pills">
-          <div class="module-pill">Automated headcount calculation</div>
-          <div class="module-pill">CP-SAT shift roster optimizer</div>
-          <div class="module-pill">Skills × availability × rest rules</div>
-          <div class="module-pill">Gap table + Gantt shift board</div>
+      <div class="mod-card c2">
+        <div class="mod-n">MODULE 02</div><div class="mod-icon">&#128119;</div>
+        <div class="mod-name">Smart Workforce<br>Planning</div>
+        <div class="mod-desc">Converts volume forecasts to required labor hours to shift headcount using OR-Tools CP-SAT constraint solver with real labor law rules and skills matrices.</div>
+        <div class="mod-bullets">
+          <div class="mod-bullet">Auto headcount calculation</div>
+          <div class="mod-bullet">CP-SAT shift roster optimizer</div>
+          <div class="mod-bullet">Skills x availability x rest rules</div>
+          <div class="mod-bullet">Gap table + Gantt shift board</div>
         </div>
       </div>
-
-      <div class="module-card m3">
-        <div class="module-num">MODULE 03</div>
-        <div class="module-icon">⚡</div>
-        <div class="module-name">Efficiency<br>Dashboard</div>
-        <div class="module-desc">Introduces the OEI (Ops Efficiency Index) — the industry-first measurable yardstick benchmarking hub performance across every process and shift.</div>
-        <div class="module-pills">
-          <div class="module-pill">OEI per zone / process / shift</div>
-          <div class="module-pill">Cycle-time waterfall chart</div>
-          <div class="module-pill">Period comparison & trending</div>
-          <div class="module-pill">Network benchmark overlay</div>
+      <div class="mod-card c3">
+        <div class="mod-n">MODULE 03</div><div class="mod-icon">&#9889;</div>
+        <div class="mod-name">Efficiency<br>Dashboard</div>
+        <div class="mod-desc">Introduces the OEI, the industry-first measurable yardstick benchmarking hub performance across every process, zone, and shift. The direct answer to challenge #1.</div>
+        <div class="mod-bullets">
+          <div class="mod-bullet">OEI per zone / process / shift</div>
+          <div class="mod-bullet">Cycle-time waterfall chart</div>
+          <div class="mod-bullet">Period comparison &amp; trending</div>
+          <div class="mod-bullet">Network benchmark overlay</div>
         </div>
       </div>
-
-      <div class="module-card m4">
-        <div class="module-num">MODULE 04</div>
-        <div class="module-icon">🔧</div>
-        <div class="module-name">Resource<br>Optimization Engine</div>
-        <div class="module-desc">SimPy discrete-event digital twin simulates "What-if" scenarios. Identifies under/overutilized zones and recommends redistribution with projected OEI delta.</div>
-        <div class="module-pills">
-          <div class="module-pill">Volume surge / absenteeism lab</div>
-          <div class="module-pill">Cost impact projection</div>
-          <div class="module-pill">SLA breach probability simulation</div>
-          <div class="module-pill">Recommended rebalancing actions</div>
+      <div class="mod-card c4">
+        <div class="mod-n">MODULE 04</div><div class="mod-icon">&#128295;</div>
+        <div class="mod-name">Resource<br>Optimization Engine</div>
+        <div class="mod-desc">SimPy discrete-event digital twin simulates what-if scenarios. Identifies under/overutilized zones and recommends redistribution with projected OEI delta and cost impact.</div>
+        <div class="mod-bullets">
+          <div class="mod-bullet">Volume surge / absenteeism lab</div>
+          <div class="mod-bullet">Cost impact projection</div>
+          <div class="mod-bullet">SLA breach probability simulation</div>
+          <div class="mod-bullet">Recommended rebalancing actions</div>
         </div>
       </div>
     </div>
   </div>
-
-  <div class="slide-footer">
-    <span>UPS SYNAPSE OPS — CONFIDENTIAL</span>
-    <span>SOLUTION ARCHITECTURE — FOUR MODULE OVERVIEW</span>
-    <span>03 / 09</span>
-  </div>
+  <div class="slide-footer"><span>UPS Synapse Ops &mdash; Confidential</span><span>Solution Architecture &middot; Four Module Overview</span></div>
 </div>
 
-<!-- ═══════════════════════════════════ SLIDE 4 — OEI FORMULA ═══════════════════════════════════ -->
-<div class="slide slide-dark" id="slide-3">
-  <div class="bg-grid"></div>
-  <div class="slide-topbar"></div>
-
-  <div class="oei-layout">
+<!-- SLIDE 4 OEI -->
+<div class="slide" id="s3">
+  <div class="accent-line"></div><div class="bg-grid"></div>
+  <div class="bg-radial" style="width:500px;height:500px;top:-100px;right:50px;opacity:.6;"></div>
+  <div class="slide-num">04 / 09</div>
+  <div class="s3-inner">
     <div>
-      <div class="eyebrow">Novelty #1 — The Headline Deliverable</div>
-      <div class="slide-section-title">The <span class="gold">Ops Efficiency Index</span><br>Warehousing's Missing Yardstick</div>
+      <div class="eyebrow">Innovation #1 &mdash; The Headline Deliverable</div>
+      <div class="sec-title">The <span class="g">Ops Efficiency Index</span><br>Warehousing's Missing Yardstick</div>
     </div>
-
-    <div class="oei-formula-display">
-      <div class="formula-part" style="flex:0.5;">
-        <div class="label">OEI</div>
-        <div class="value" style="font-size:40px;color:var(--ups-gold);">OEI</div>
-      </div>
-      <div class="formula-op">=</div>
-      <div class="formula-part">
-        <div class="label">Throughput Ratio</div>
-        <div class="value">T</div>
-        <div class="sub">actual UPH ÷ engineered std</div>
-      </div>
-      <div class="formula-op">×</div>
-      <div class="formula-part">
-        <div class="label">Quality Ratio</div>
-        <div class="value">Q</div>
-        <div class="sub">1 − (rework + misroutes) / total</div>
-      </div>
-      <div class="formula-op">×</div>
-      <div class="formula-part">
-        <div class="label">Utilization Ratio</div>
-        <div class="value">U</div>
-        <div class="sub">productive hrs ÷ paid hrs</div>
-      </div>
+    <div class="formula-bar">
+      <div class="f-part" style="flex:0.6;"><div class="f-label">Result</div><div class="f-val" style="font-size:48px;color:var(--gold);">OEI</div></div>
+      <div class="f-op">=</div>
+      <div class="f-part"><div class="f-label">Throughput Ratio</div><div class="f-val">T</div><div class="f-sub">actual UPH &divide; engineered standard</div></div>
+      <div class="f-op">&times;</div>
+      <div class="f-part"><div class="f-label">Quality Ratio</div><div class="f-val">Q</div><div class="f-sub">1 &minus; (rework + misroutes) / total</div></div>
+      <div class="f-op">&times;</div>
+      <div class="f-part"><div class="f-label">Utilization Ratio</div><div class="f-val">U</div><div class="f-sub">productive hrs &divide; paid hrs</div></div>
     </div>
-
-    <div class="oei-grid">
-      <div class="oei-feature">
-        <div class="oei-feature-icon">📐</div>
-        <div class="oei-feature-text">
-          <h4>Process-Level Granularity</h4>
-          <p>Computed per process (unload → sort → stow → pick → pack → load), per zone, per shift. One number a hub manager can compare Monday vs Tuesday, Hub ATL vs Hub LAX.</p>
-        </div>
-      </div>
-      <div class="oei-feature">
-        <div class="oei-feature-icon">🏭</div>
-        <div class="oei-feature-text">
-          <h4>Manufacturing Has OEE. Logistics Now Has OEI.</h4>
-          <p>OEE (Overall Equipment Effectiveness) transformed manufacturing. OEI does the same for warehouse operations — a single, auditable, comparable efficiency benchmark.</p>
-        </div>
-      </div>
-      <div class="oei-feature">
-        <div class="oei-feature-icon">📊</div>
-        <div class="oei-feature-text">
-          <h4>Actionable in Real-Time</h4>
-          <p>Mid-shift burn-down tracker: if inbound tracks 18% above forecast at 11 AM, the system nudges: <em>"Move 3 workers from Pack → Unload, Zone C."</em> Reactive → Proactive.</p>
-        </div>
-      </div>
-      <div class="oei-feature">
-        <div class="oei-feature-icon">📉</div>
-        <div class="oei-feature-text">
-          <h4>Trend, Compare, Benchmark</h4>
-          <p>Week-over-week OEI trends, period comparison, and network median overlay allow regional leaders to benchmark hubs and direct resources to the bottom quartile.</p>
-        </div>
-      </div>
+    <div class="oei-features">
+      <div class="oei-feat"><div class="oei-feat-ico">&#128208;</div><div><h4>Process-Level Granularity</h4><p>Computed per process (unload &rarr; sort &rarr; stow &rarr; pick &rarr; pack &rarr; load), per zone, per shift. One number a hub manager can compare Monday vs Tuesday, Hub ATL vs Hub LAX.</p></div></div>
+      <div class="oei-feat"><div class="oei-feat-ico">&#127981;</div><div><h4>Manufacturing Has OEE. Logistics Now Has OEI.</h4><p>OEE transformed manufacturing. OEI does the same for warehouse operations &mdash; a single, auditable, comparable efficiency benchmark across the entire UPS network.</p></div></div>
+      <div class="oei-feat"><div class="oei-feat-ico">&#9889;</div><div><h4>Actionable in Real-Time</h4><p>Mid-shift burn-down tracker: if inbound tracks 18% above forecast at 11 AM, the system recommends &mdash; "Move 3 workers from Pack to Unload, Zone C." Reactive becomes Proactive.</p></div></div>
+      <div class="oei-feat"><div class="oei-feat-ico">&#128202;</div><div><h4>Trend, Compare, Benchmark</h4><p>Week-over-week OEI trends, period comparison, and network median overlay allow regional leaders to benchmark hubs and direct improvement resources with confidence.</p></div></div>
     </div>
   </div>
-
-  <div class="slide-footer">
-    <span>UPS SYNAPSE OPS — CONFIDENTIAL</span>
-    <span>OEI — OPS EFFICIENCY INDEX DEFINITION</span>
-    <span>04 / 09</span>
-  </div>
+  <div class="slide-footer"><span>UPS Synapse Ops &mdash; Confidential</span><span>OEI &middot; Ops Efficiency Index Definition</span></div>
 </div>
 
-<!-- ═══════════════════════════════════ SLIDE 5 — NOVELTIES ═══════════════════════════════════ -->
-<div class="slide slide-dark" id="slide-4">
-  <div class="bg-grid"></div>
-  <div class="slide-topbar"></div>
-
-  <div class="novelty-layout">
+<!-- SLIDE 5 INNOVATIONS -->
+<div class="slide" id="s4">
+  <div class="accent-line"></div><div class="bg-grid"></div>
+  <div class="slide-num">05 / 09</div>
+  <div class="s4-inner">
     <div>
-      <div class="eyebrow">What We Built Beyond the Brief</div>
-      <div class="slide-section-title">6 Extra Capabilities <span class="gold">No Other Team Built</span></div>
+      <div class="eyebrow">Advanced Capabilities &mdash; Engineered for Impact</div>
+      <div class="sec-title">6 Innovations <span class="g">Beyond the Brief</span></div>
     </div>
-
-    <div class="novelty-grid">
-      <div class="novelty-card">
-        <span class="novelty-badge badge-gold">★ Core Novelty</span>
-        <div class="novelty-title">Uncertainty-Aware<br>Staffing Engine</div>
-        <div class="novelty-desc">We don't say "you need 42 people." We output P10/P50/P90 quantile forecasts and solve a newsvendor trade-off: cost of understaffing (SLA penalty, overtime) vs overstaffing (idle labor). Manager picks a service level from a cost curve.</div>
-        <div class="novelty-tech">LightGBM · Quantile Regression · Newsvendor Model</div>
+    <div class="nov-grid">
+      <div class="nov-card">
+        <span class="badge b-gold">Core Innovation</span>
+        <div class="nov-title">Uncertainty-Aware<br>Staffing Engine</div>
+        <div class="nov-desc">We don't output "you need 42 people." We produce P10/P50/P90 quantile forecasts and solve a newsvendor trade-off &mdash; cost of understaffing (SLA penalty, overtime) vs overstaffing (idle labor). Managers choose their own service level from a cost curve.</div>
+        <div class="nov-tech">LightGBM &middot; Quantile Regression &middot; Newsvendor Model</div>
       </div>
-
-      <div class="novelty-card">
-        <span class="novelty-badge badge-gold">★ Core Novelty</span>
-        <div class="novelty-title">Digital Twin<br>What-If Lab</div>
-        <div class="novelty-desc">SimPy discrete-event simulation of the entire hub. "What if inbound spikes 30% and 5 sorters call in sick?" → Simulated dock-to-stock time, backlog accumulation, and SLA breach probability. Monte Carlo over forecast uncertainty.</div>
-        <div class="novelty-tech">SimPy · Monte Carlo Simulation · Discrete-Event</div>
+      <div class="nov-card">
+        <span class="badge b-gold">Core Innovation</span>
+        <div class="nov-title">Digital Twin<br>What-If Lab</div>
+        <div class="nov-desc">SimPy discrete-event simulation of the full hub. "What if inbound spikes 30% and 5 sorters call in sick?" Simulated dock-to-stock time, backlog accumulation, and SLA breach probability in seconds. Monte Carlo over forecast uncertainty.</div>
+        <div class="nov-tech">SimPy &middot; Monte Carlo Simulation &middot; Discrete-Event</div>
       </div>
-
-      <div class="novelty-card">
-        <span class="novelty-badge badge-gold">★ Core Novelty</span>
-        <div class="novelty-title">Prescriptive CP-SAT<br>Roster Optimizer</div>
-        <div class="novelty-desc">OR-Tools CP-SAT constraint satisfaction solver generates a publishable shift roster — not just a number. Respects skills matrix, max consecutive hours, rest rules (min 11h), cross-training, and union labor limits.</div>
-        <div class="novelty-tech">OR-Tools CP-SAT · Constraint Satisfaction · Gantt Board</div>
+      <div class="nov-card">
+        <span class="badge b-gold">Core Innovation</span>
+        <div class="nov-title">Prescriptive CP-SAT<br>Roster Optimizer</div>
+        <div class="nov-desc">OR-Tools CP-SAT generates a publishable shift roster, not just a headcount number. Respects skills matrix, max consecutive hours, rest rules (min 11h), cross-training eligibility, and labor law limits. Output is a Gantt board ready to post.</div>
+        <div class="nov-tech">OR-Tools CP-SAT &middot; Constraint Satisfaction &middot; Gantt Board</div>
       </div>
-
-      <div class="novelty-card">
-        <span class="novelty-badge badge-green">Extra Feature</span>
-        <div class="novelty-title">SHAP Explainable<br>Forecast Drivers</div>
-        <div class="novelty-desc">Managers don't trust black boxes. A "Why" panel shows SHAP-attributed drivers per forecast: holiday lift, rain effect, day-of-week seasonality, and promotional events. Builds trust. Wins adoption.</div>
-        <div class="novelty-tech">SHAP · LightGBM Feature Importance · Driver Panel</div>
+      <div class="nov-card">
+        <span class="badge b-green">Platform Feature</span>
+        <div class="nov-title">SHAP Explainable<br>Forecast Drivers</div>
+        <div class="nov-desc">Managers don't trust black boxes. A "Why" panel shows SHAP-attributed drivers per forecast point: holiday lift, rain effect, day-of-week seasonality, promotional events. Transparency builds operational adoption at the manager level.</div>
+        <div class="nov-tech">SHAP &middot; LightGBM Feature Importance &middot; Driver Panel</div>
       </div>
-
-      <div class="novelty-card">
-        <span class="novelty-badge badge-green">Extra Feature</span>
-        <div class="novelty-title">Ops Copilot<br>NLP Agent</div>
-        <div class="novelty-desc">"Why did dock-to-stock slip last Tuesday?" → Agent queries the KPI semantic store, correlates with anomaly log, weather joins, and returns a natural-language narrative. Powered by Gemini + deterministic fallback layer.</div>
-        <div class="novelty-tech">Gemini API · Semantic KPI Layer · RAG Architecture</div>
+      <div class="nov-card">
+        <span class="badge b-green">Platform Feature</span>
+        <div class="nov-title">Ops Copilot<br>NLP Agent</div>
+        <div class="nov-desc">"Why did dock-to-stock slip last Tuesday?" The agent queries the KPI semantic layer, correlates with the anomaly log, weather joins, and returns a natural-language narrative. Powered by Gemini API with a deterministic fallback layer for reliability.</div>
+        <div class="nov-tech">Gemini API &middot; Semantic KPI Layer &middot; RAG Architecture</div>
       </div>
-
-      <div class="novelty-card">
-        <span class="novelty-badge badge-blue">Platform Feature</span>
-        <div class="novelty-title">Model Drift<br>Anomaly Detection</div>
-        <div class="novelty-desc">Dual monitoring layer: KPI anomaly detection (STL residuals + Isolation Forest) on operational streams, plus model accuracy drift monitoring with automatic retrain triggers. The system knows when it needs to learn again.</div>
-        <div class="novelty-tech">Isolation Forest · STL Decomposition · WAPE Drift</div>
+      <div class="nov-card">
+        <span class="badge b-blue">Intelligence Layer</span>
+        <div class="nov-title">Model Drift<br>Anomaly Detection</div>
+        <div class="nov-desc">Dual monitoring: KPI anomaly detection (STL residuals + Isolation Forest) on operational streams, plus model accuracy drift monitoring with automatic retrain triggers. The platform knows when its own forecasts need to be updated.</div>
+        <div class="nov-tech">Isolation Forest &middot; STL Decomposition &middot; WAPE Drift</div>
       </div>
     </div>
   </div>
-
-  <div class="slide-footer">
-    <span>UPS SYNAPSE OPS — CONFIDENTIAL</span>
-    <span>EXTRA CAPABILITIES & INNOVATION HIGHLIGHTS</span>
-    <span>05 / 09</span>
-  </div>
+  <div class="slide-footer"><span>UPS Synapse Ops &mdash; Confidential</span><span>Advanced Capabilities &amp; Engineering Highlights</span></div>
 </div>
 
-<!-- ═══════════════════════════════════ SLIDE 6 — PRIVACY FLOOR ═══════════════════════════════════ -->
-<div class="slide slide-dark" id="slide-5">
-  <div class="bg-grid"></div>
-  <div class="slide-topbar"></div>
-
-  <div class="privacy-layout">
-    <div class="privacy-left">
-      <div class="eyebrow">Architectural Guarantee — Page 2 Note</div>
-      <div class="slide-section-title">Most Teams<br>Will <span class="gold">Miss This</span></div>
-
-      <div style="font-size:14px;color:var(--text-muted);line-height:1.7;margin-top:4px;max-width:440px;">
-        The problem statement note is explicit: <em style="color:var(--text-light)">"This tool is not intended to measure or evaluate individual employee productivity."</em> This is not a footnote — it is a judge test.
+<!-- SLIDE 6 PRIVACY -->
+<div class="slide" id="s5">
+  <div class="accent-line"></div><div class="bg-grid"></div>
+  <div class="slide-num">06 / 09</div>
+  <div class="s5-inner">
+    <div class="s5-left">
+      <div class="eyebrow">Architectural Guarantee &mdash; Problem Statement Note</div>
+      <div class="sec-title">Privacy Built<br>Into the <span class="g">Foundation</span></div>
+      <div style="font-size:14px;color:var(--muted);line-height:1.7;margin-top:8px;max-width:460px;">
+        The problem statement specifies: <em style="color:var(--text);">"This tool is not intended to measure or evaluate individual employee productivity."</em> We treat this as an architectural requirement, not a display guideline.
       </div>
-
       <div class="privacy-guarantee">
-        <h3>🛡 Aggregation Floor Guarantee — N = 5</h3>
-        <p>Every OEI metric, throughput ratio, quality ratio, and utilization ratio is <strong>hardcoded to be redacted</strong> if derived from fewer than 5 active workers in any zone/shift/process slice. No individual can be profiled. This is enforced at the API response layer — not just the UI.</p>
+        <h3>&#128737; Aggregation Floor &mdash; N &ge; 5</h3>
+        <p>Every OEI metric, throughput ratio, quality ratio, and utilization ratio is <strong style="color:var(--text);">hardcoded to null</strong> if derived from fewer than 5 active workers in any zone/shift/process slice. No individual worker can ever be inferred from any metric shown on this platform.</p>
       </div>
-
-      <div class="privacy-n-badge">
-        <div class="n-number">N≥5</div>
-        <div class="n-label">Minimum active workers required<br>before any metric is displayed.<br><strong style="color:var(--text-light);">All others return null.</strong></div>
+      <div class="n-badge">
+        <div class="n-num">N&ge;5</div>
+        <div class="n-lbl">Minimum active workers required<br>before any efficiency metric is shown.<br><strong>Fewer than 5 &rarr; all values redacted.</strong></div>
       </div>
-
-      <div style="margin-top:16px;font-size:12px;color:var(--text-muted);line-height:1.6;">
-        Configurable via Admin panel. Compliant with GDPR Article 89 aggregation requirements and enterprise HR data governance standards.
-      </div>
+      <div style="margin-top:16px;font-size:12px;color:var(--muted);line-height:1.6;">Configurable via Admin panel. Compatible with GDPR Article 89 aggregation principles and enterprise HR data governance requirements.</div>
     </div>
-
-    <div class="privacy-right">
-      <div style="font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:12px;">Live API Response Example</div>
-      <div class="redacted-demo">
-        <div class="redacted-row">
-          <span class="redact-key">"process"</span>
-          <span class="redact-value-ok">"sort"</span>
-        </div>
-        <div class="redacted-row">
-          <span class="redact-key">"active_worker_count"</span>
-          <span class="redact-value-ok">12</span>
-        </div>
-        <div class="redacted-row">
-          <span class="redact-key">"throughput_ratio"</span>
-          <span class="redact-value-ok">0.87</span>
-        </div>
-        <div class="redacted-row">
-          <span class="redact-key">"oei"</span>
-          <span class="redact-value-ok">0.74</span>
-        </div>
-        <div style="margin:14px 0 8px;opacity:0.4;font-size:9px;letter-spacing:2px;color:var(--text-muted);">— ZONE WITH 3 WORKERS (REDACTED) —</div>
-        <div class="redacted-row">
-          <span class="redact-key">"process"</span>
-          <span class="redact-value-ok">"unload"</span>
-        </div>
-        <div class="redacted-row">
-          <span class="redact-key">"active_worker_count"</span>
-          <span class="redact-value-ok">3</span>
-        </div>
-        <div class="redacted-row">
-          <span class="redact-key">"throughput_ratio"</span>
-          <span class="redact-value-null">null</span>
-        </div>
-        <div class="redacted-row">
-          <span class="redact-key">"oei"</span>
-          <span class="redact-value-null">null</span>
-        </div>
-        <div class="redacted-row">
-          <span class="redact-key">"privacy_redacted"</span>
-          <span class="redact-value-null">true</span>
-        </div>
-        <div class="redact-msg">
-          "privacy_message": "Data redacted: Active workers (3) below aggregation floor threshold (5)"
-        </div>
+    <div class="s5-right">
+      <div style="font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:2px;margin-bottom:14px;">Live API Response &middot; Enforcement Proof</div>
+      <div class="code-box">
+        <div class="code-title">Zone with 12 workers &mdash; metrics visible</div>
+        <div class="cr"><span class="ck">"process"</span><span class="cv-ok">"sort"</span></div>
+        <div class="cr"><span class="ck">"active_worker_count"</span><span class="cv-ok">12</span></div>
+        <div class="cr"><span class="ck">"throughput_ratio"</span><span class="cv-ok">0.87</span></div>
+        <div class="cr"><span class="ck">"quality_ratio"</span><span class="cv-ok">0.96</span></div>
+        <div class="cr"><span class="ck">"oei"</span><span class="cv-ok">0.74</span></div>
+        <div class="divider-row">&mdash;&mdash; zone with 3 workers (below floor) &mdash;&mdash;</div>
+        <div class="cr"><span class="ck">"process"</span><span class="cv-ok">"unload"</span></div>
+        <div class="cr"><span class="ck">"active_worker_count"</span><span class="cv-ok">3</span></div>
+        <div class="cr"><span class="ck">"throughput_ratio"</span><span class="cv-null">null</span></div>
+        <div class="cr"><span class="ck">"oei"</span><span class="cv-null">null</span></div>
+        <div class="cr"><span class="ck">"privacy_redacted"</span><span class="cv-true">true</span></div>
+        <div class="cv-msg">"privacy_message": "Data redacted: Active workers (3) below aggregation floor threshold (5)"</div>
       </div>
-
-      <div style="margin-top:16px;background:rgba(100,167,11,0.06);border:1px solid rgba(100,167,11,0.2);border-radius:6px;padding:14px 16px;font-size:12px;color:var(--text-muted);line-height:1.5;">
-        <strong style="color:#64A70B;">✓ Enforced at 3 layers:</strong> Database query filter → API aggregation check → Frontend display guard. Judges can probe the raw API and it still holds.
-      </div>
+      <div class="layers-row"><strong>&#10003; Enforced at 3 independent layers:</strong><br>Database query filter &rarr; API aggregation check &rarr; Frontend display guard.<br>The raw API itself returns nulls &mdash; not just the UI.</div>
     </div>
   </div>
-
-  <div class="slide-footer">
-    <span>UPS SYNAPSE OPS — CONFIDENTIAL</span>
-    <span>PRIVACY ARCHITECTURE — AGGREGATION FLOOR N=5</span>
-    <span>06 / 09</span>
-  </div>
+  <div class="slide-footer"><span>UPS Synapse Ops &mdash; Confidential</span><span>Privacy Architecture &middot; Aggregation Floor N=5</span></div>
 </div>
 
-<!-- ═══════════════════════════════════ SLIDE 7 — TECH STACK ═══════════════════════════════════ -->
-<div class="slide slide-dark" id="slide-6">
-  <div class="bg-grid"></div>
-  <div class="slide-topbar"></div>
-
-  <div class="arch-layout">
+<!-- SLIDE 7 TECH -->
+<div class="slide" id="s6">
+  <div class="accent-line"></div><div class="bg-grid"></div>
+  <div class="slide-num">07 / 09</div>
+  <div class="s6-inner">
     <div>
-      <div class="eyebrow">Technology Architecture</div>
-      <div class="slide-section-title">Built for <span class="gold">Production</span> — Not Just a Demo</div>
+      <div class="eyebrow">Technical Architecture</div>
+      <div class="sec-title">Built for <span class="g">Production</span> &mdash; Not Just a Demo</div>
     </div>
-
-    <div class="arch-flow">
-      <div class="arch-box">
-        <div class="arch-box-title" style="color:#E67E22;">📥 Data Sources</div>
-        <div class="arch-item">WMS Scan Events</div>
-        <div class="arch-item">TMS Trailer Arrivals</div>
-        <div class="arch-item">HRMS Roster & Skills</div>
-        <div class="arch-item">ERP Inventory Movements</div>
-        <div class="arch-item">Weather API (Open-Meteo)</div>
-        <div class="arch-item">Holiday Calendar</div>
-        <div class="arch-item">Olist E-Commerce Dataset</div>
-        <div class="arch-item">Synthetic WMS Generator</div>
+    <div class="arch-row">
+      <div class="arch-col">
+        <div class="arch-col-hd" style="color:#E67E22;">&#128229; Data Sources</div>
+        <div class="ai">WMS Scan Events</div><div class="ai">TMS Trailer Arrivals</div>
+        <div class="ai">HRMS Roster &amp; Skills</div><div class="ai">ERP Inventory Movements</div>
+        <div class="ai">Weather API (Open-Meteo)</div><div class="ai">Holiday Calendar</div>
+        <div class="ai">Olist E-Commerce Dataset</div><div class="ai">Synthetic WMS Generator</div>
       </div>
-      <div class="arch-arrow">▶</div>
-      <div class="arch-box">
-        <div class="arch-box-title" style="color:#9B59B6;">🧠 ML / OR Layer</div>
-        <div class="arch-item">LightGBM Quantile Forecast</div>
-        <div class="arch-item">SHAP Explainability</div>
-        <div class="arch-item">OR-Tools CP-SAT Scheduler</div>
-        <div class="arch-item">SimPy Digital Twin</div>
-        <div class="arch-item">Isolation Forest Anomaly</div>
-        <div class="arch-item">STL Decomposition</div>
-        <div class="arch-item">OEI Calculation Engine</div>
-        <div class="arch-item">Gemini Copilot Agent</div>
+      <div class="arch-col">
+        <div class="arch-col-hd" style="color:#9B59B6;">&#129504; ML / OR Engine</div>
+        <div class="ai">LightGBM Quantile Forecast</div><div class="ai">SHAP Explainability Layer</div>
+        <div class="ai">OR-Tools CP-SAT Scheduler</div><div class="ai">SimPy Discrete-Event Twin</div>
+        <div class="ai">Isolation Forest Anomaly</div><div class="ai">STL Decomposition</div>
+        <div class="ai">OEI Calculation Engine</div><div class="ai">Gemini Copilot Agent</div>
       </div>
-      <div class="arch-arrow">▶</div>
-      <div class="arch-box">
-        <div class="arch-box-title" style="color:#27AE60;">🗄 Data Platform</div>
-        <div class="arch-item">Aiven Cloud PostgreSQL</div>
-        <div class="arch-item">350,000+ Scan Events</div>
-        <div class="arch-item">120 Worker Roster</div>
-        <div class="arch-item">26,208 Hourly Volumes</div>
-        <div class="arch-item">SQLAlchemy ORM Models</div>
-        <div class="arch-item">Privacy Aggregation Layer</div>
-        <div class="arch-item">Medallion Data Architecture</div>
-        <div class="arch-item">TimescaleDB Hypertables*</div>
+      <div class="arch-col">
+        <div class="arch-col-hd" style="color:#27AE60;">&#128452; Data Platform</div>
+        <div class="ai">Aiven Cloud PostgreSQL</div><div class="ai">350,000+ Scan Events</div>
+        <div class="ai">120-Worker Roster Seeded</div><div class="ai">26,208 Hourly Volume Rows</div>
+        <div class="ai">SQLAlchemy ORM Models</div><div class="ai">Privacy Aggregation Layer</div>
+        <div class="ai">Medallion Architecture</div><div class="ai">TimescaleDB Hypertables*</div>
       </div>
-      <div class="arch-arrow">▶</div>
-      <div class="arch-box">
-        <div class="arch-box-title" style="color:var(--ups-gold);">🖥 Frontend</div>
-        <div class="arch-item">React 18 + TypeScript</div>
-        <div class="arch-item">Vite + Tailwind CSS</div>
-        <div class="arch-item">Recharts Fan Charts</div>
-        <div class="arch-item">WebSocket Live Telemetry</div>
-        <div class="arch-item">Gantt Shift Board</div>
-        <div class="arch-item">Zone Utilization Heatmap</div>
-        <div class="arch-item">OEI Trend Overlays</div>
-        <div class="arch-item">FastAPI + Uvicorn Backend</div>
+      <div class="arch-col">
+        <div class="arch-col-hd" style="color:var(--gold);">&#128187; Frontend</div>
+        <div class="ai">React 18 + TypeScript</div><div class="ai">Vite + Tailwind CSS</div>
+        <div class="ai">Recharts Fan Charts</div><div class="ai">WebSocket Live Telemetry</div>
+        <div class="ai">Gantt Shift Board</div><div class="ai">Zone Utilization Heatmap</div>
+        <div class="ai">OEI Trend Overlays</div><div class="ai">FastAPI + Uvicorn Backend</div>
       </div>
     </div>
-
     <div class="tech-pills">
-      <span class="tech-pill highlight">FastAPI</span>
-      <span class="tech-pill highlight">React 18</span>
-      <span class="tech-pill highlight">LightGBM</span>
-      <span class="tech-pill highlight">OR-Tools CP-SAT</span>
-      <span class="tech-pill highlight">SimPy</span>
-      <span class="tech-pill highlight">Gemini API</span>
-      <span class="tech-pill">PostgreSQL (Aiven Cloud)</span>
-      <span class="tech-pill">SQLAlchemy</span>
-      <span class="tech-pill">SHAP</span>
-      <span class="tech-pill">Isolation Forest</span>
-      <span class="tech-pill">Recharts</span>
-      <span class="tech-pill">Tailwind CSS</span>
-      <span class="tech-pill">Pydantic v2</span>
-      <span class="tech-pill">IBM Plex Mono</span>
-      <span class="tech-pill">WebSockets</span>
+      <span class="tp hi">FastAPI</span><span class="tp hi">React 18</span><span class="tp hi">LightGBM</span>
+      <span class="tp hi">OR-Tools CP-SAT</span><span class="tp hi">SimPy</span><span class="tp hi">Gemini API</span>
+      <span class="tp">PostgreSQL (Aiven Cloud)</span><span class="tp">SQLAlchemy</span><span class="tp">SHAP</span>
+      <span class="tp">Isolation Forest</span><span class="tp">Recharts</span><span class="tp">Tailwind CSS</span>
+      <span class="tp">Pydantic v2</span><span class="tp">WebSockets</span><span class="tp">IBM Plex Mono</span>
     </div>
   </div>
-
-  <div class="slide-footer">
-    <span>UPS SYNAPSE OPS — CONFIDENTIAL</span>
-    <span>TECHNICAL ARCHITECTURE & STACK</span>
-    <span>07 / 09</span>
-  </div>
+  <div class="slide-footer"><span>UPS Synapse Ops &mdash; Confidential</span><span>Technical Architecture &amp; Stack</span></div>
 </div>
 
-<!-- ═══════════════════════════════════ SLIDE 8 — IMPACT ═══════════════════════════════════ -->
-<div class="slide slide-dark" id="slide-7">
-  <div class="bg-grid"></div>
-  <div class="slide-topbar"></div>
-
-  <div class="impact-layout">
+<!-- SLIDE 8 IMPACT -->
+<div class="slide" id="s7">
+  <div class="accent-line"></div><div class="bg-grid"></div>
+  <div class="slide-num">08 / 09</div>
+  <div class="s7-inner">
     <div>
-      <div class="eyebrow">Business Impact & Requirements Coverage</div>
-      <div class="slide-section-title">Every Ask. <span class="gold">Answered.</span> Plus More.</div>
+      <div class="eyebrow">Requirements Coverage &amp; Business Impact</div>
+      <div class="sec-title">Every Ask. <span class="g">Fully Answered.</span></div>
     </div>
-
-    <div class="impact-grid">
-      <div class="impact-card">
-        <div class="impact-number">100<span class="impact-unit">%</span></div>
-        <div class="impact-label">UPS problem requirements addressed across all 6 stated challenges</div>
-      </div>
-      <div class="impact-card">
-        <div class="impact-number">350<span style="font-size:28px;">K+</span></div>
-        <div class="impact-label">Synthetic WMS scan events seeded to cloud PostgreSQL — production-schema-compatible</div>
-      </div>
-      <div class="impact-card">
-        <div class="impact-number">6<span style="font-size:28px;"> +</span></div>
-        <div class="impact-label">Bonus capabilities built beyond brief: Copilot, Digital Twin, SHAP, Drift Monitor, CP-SAT, Privacy Shield</div>
-      </div>
+    <div class="impact-3">
+      <div class="imp-c"><div class="imp-n">100<span class="imp-u">%</span></div><div class="imp-l">UPS problem requirements addressed across all 6 stated operational challenges</div></div>
+      <div class="imp-c"><div class="imp-n">350<span style="font-size:36px;">K+</span></div><div class="imp-l">Synthetic WMS scan events on cloud PostgreSQL, production-schema-compatible</div></div>
+      <div class="imp-c"><div class="imp-n">6<span style="font-size:36px;"> +</span></div><div class="imp-l">Advanced capabilities engineered beyond brief: Copilot, Digital Twin, SHAP, Drift Monitor, CP-SAT, Privacy Shield</div></div>
     </div>
-
-    <div class="impact-checklist">
-      <div class="check-item"><span class="check">✓</span><div><strong>Forecast inbound, outbound, inventory volumes</strong> — LightGBM P10/P50/P90 quantile regression with weather and holiday features</div></div>
-      <div class="check-item"><span class="check">✓</span><div><strong>Determine manpower requirements</strong> — Formula-based hours (vol÷UPH) + CP-SAT publishable roster with constraint satisfaction</div></div>
-      <div class="check-item"><span class="check">✓</span><div><strong>Enable effective resource planning & allocation</strong> — Optimization Lab with redistribution recommendations and projected OEI delta</div></div>
-      <div class="check-item"><span class="check">✓</span><div><strong>Measure operational efficiency at process level</strong> — OEI Engine: per zone, per process, per shift. Cycle-time waterfall. Network benchmark overlay</div></div>
-      <div class="check-item"><span class="check">✓</span><div><strong>Improve capacity planning through data-driven insights</strong> — SimPy What-If Lab: peak surge, absenteeism, SLA breach probability simulation</div></div>
-      <div class="check-item"><span class="check">✓</span><div><strong>Support proactive workforce management</strong> — Mid-shift burn-down + real-time reallocation nudges via WebSocket telemetry stream</div></div>
-      <div class="check-item"><span class="check" style="color:var(--ups-gold);">★</span><div><strong>No individual employee scoring</strong> — Aggregation floor N≥5 enforced at database, API, and UI layers. Architecturally guaranteed.</div></div>
-      <div class="check-item"><span class="check" style="color:var(--ups-gold);">★</span><div><strong>NLP Ops Copilot</strong> — Gemini-powered agent over KPI semantic layer. "Why did dock-to-stock slip?" → narrative answer.</div></div>
+    <div class="req-grid">
+      <div class="req"><span class="ck">&#10003;</span><div><strong>Forecast inbound, outbound, inventory volumes</strong> &mdash; LightGBM P10/P50/P90 with weather and holiday features</div></div>
+      <div class="req"><span class="ck">&#10003;</span><div><strong>Determine manpower requirements</strong> &mdash; vol&divide;UPH formula + CP-SAT publishable roster with constraint satisfaction</div></div>
+      <div class="req"><span class="ck">&#10003;</span><div><strong>Enable effective resource planning &amp; allocation</strong> &mdash; Optimization Lab with redistribution recommendations and OEI delta projection</div></div>
+      <div class="req"><span class="ck">&#10003;</span><div><strong>Measure operational efficiency at process level</strong> &mdash; OEI Engine per zone, per process, per shift with cycle-time waterfall</div></div>
+      <div class="req"><span class="ck">&#10003;</span><div><strong>Improve capacity planning through data-driven insights</strong> &mdash; SimPy What-If Lab: peak surge, absenteeism, SLA breach probability simulation</div></div>
+      <div class="req"><span class="ck">&#10003;</span><div><strong>Support proactive workforce management</strong> &mdash; Mid-shift burn-down + real-time reallocation nudges via WebSocket telemetry stream</div></div>
+      <div class="req"><span class="ck gold">&#9733;</span><div><strong>No individual employee scoring</strong> &mdash; N&ge;5 aggregation floor enforced at database, API, and UI layers. Architecturally guaranteed.</div></div>
+      <div class="req"><span class="ck gold">&#9733;</span><div><strong>NLP Ops Copilot</strong> &mdash; Gemini-powered agent over KPI semantic layer. Natural-language operational narrative on demand.</div></div>
     </div>
   </div>
+  <div class="slide-footer"><span>UPS Synapse Ops &mdash; Confidential</span><span>Requirements Coverage &amp; Business Impact</span></div>
+</div>
 
-  <div class="slide-footer">
-    <span>UPS SYNAPSE OPS — CONFIDENTIAL</span>
-    <span>REQUIREMENTS COVERAGE & BUSINESS IMPACT</span>
-    <span>08 / 09</span>
+<!-- SLIDE 9 CLOSING -->
+<div class="slide" id="s8">
+  <div class="accent-line"></div><div class="bg-grid"></div>
+  <div class="bg-radial" style="width:800px;height:800px;bottom:-300px;left:50%;transform:translateX(-50%);opacity:.7;"></div>
+  <div class="slide-num">09 / 09</div>
+  <div class="s8-inner">
+    <div style="display:flex;align-items:center;gap:14px;">
+      <div class="shield">ups</div>
+      <span class="eyebrow">UPS Ground Hub Services &mdash; Logistics Operations Excellence</span>
+    </div>
+    <div class="closing-title">We Didn't Just<br>Answer the Problem.<br>We <span class="g">Defined the Standard.</span></div>
+    <div class="closing-sub">Synapse Ops introduces the <strong>Ops Efficiency Index (OEI)</strong> &mdash; the first standardized performance yardstick for warehouse operations. Every hub manager now has a single comparable number, built on real cloud infrastructure, real machine learning, and real privacy guarantees.</div>
+    <div class="cta-row">
+      <a class="btn-p" href="http://localhost:5174/" target="_blank">&#128187; Live Demo &mdash; localhost:5174</a>
+      <a class="btn-g" href="http://localhost:8000/docs" target="_blank">&#128225; API Docs &mdash; localhost:8000</a>
+    </div>
+    <div class="metrics-row">
+      <div class="m-item"><div class="m-n">350K+</div><div class="m-l">DB Records</div></div>
+      <div class="m-item"><div class="m-n">18+</div><div class="m-l">API Endpoints</div></div>
+      <div class="m-item"><div class="m-n">N&ge;5</div><div class="m-l">Privacy Floor</div></div>
+      <div class="m-item"><div class="m-n">100%</div><div class="m-l">Requirements Met</div></div>
+    </div>
+  </div>
+  <div class="slide-footer"><span>UPS Synapse Ops &mdash; Confidential</span><span>Team Presentation &middot; Logistics Operations Excellence Hackathon</span></div>
+</div>
+
+</div>
+
+<!-- FLOATING NAV -->
+<div class="nav">
+  <div style="display:flex;gap:4px;">
+    <button class="nav-arr" onclick="prev()">&#8249;</button>
+  </div>
+  <div class="nav-sep"></div>
+  <button class="nav-btn active" onclick="goTo(0)">01</button>
+  <button class="nav-btn" onclick="goTo(1)">02</button>
+  <button class="nav-btn" onclick="goTo(2)">03</button>
+  <button class="nav-btn" onclick="goTo(3)">04</button>
+  <button class="nav-btn" onclick="goTo(4)">05</button>
+  <button class="nav-btn" onclick="goTo(5)">06</button>
+  <button class="nav-btn" onclick="goTo(6)">07</button>
+  <button class="nav-btn" onclick="goTo(7)">08</button>
+  <button class="nav-btn" onclick="goTo(8)">09</button>
+  <div class="nav-sep"></div>
+  <div style="display:flex;gap:4px;">
+    <button class="nav-arr" onclick="next()">&#8250;</button>
   </div>
 </div>
 
-<!-- ═══════════════════════════════════ SLIDE 9 — CLOSING ═══════════════════════════════════ -->
-<div class="slide slide-hero" id="slide-8">
-  <div class="bg-grid"></div>
-  <div class="bg-glow" style="bottom:-200px;left:50%;transform:translateX(-50%);"></div>
-  <div class="slide-topbar"></div>
-
-  <div class="closing-content">
-    <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px;">
-      <div class="ups-shield">ups</div>
-      <span class="eyebrow">UPS Ground Hub Services — Logistics Operations Excellence</span>
-    </div>
-    <div class="closing-tagline">
-      We Didn't Just<br>Answer the Problem.<br>We <span class="gold">Defined the Standard.</span>
-    </div>
-    <div class="closing-sub">
-      Synapse Ops introduces the <strong style="color:var(--ups-gold);">Ops Efficiency Index (OEI)</strong> — warehousing's first standardized performance yardstick. Every hub manager now has a single number, comparable Monday to Monday, hub to hub. Built on real cloud infrastructure, real ML, and real privacy guarantees.
-    </div>
-    <div class="closing-cta-row">
-      <a class="btn-primary" href="http://localhost:5174/" target="_blank">🖥 Live Demo → localhost:5174</a>
-      <a class="btn-ghost" href="http://localhost:8000/docs" target="_blank">📡 API Docs → localhost:8000</a>
-    </div>
-
-    <div style="margin-top:36px;display:flex;gap:48px;opacity:0.5;">
-      <div style="text-align:center;">
-        <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--ups-gold);letter-spacing:2px;text-transform:uppercase;">DB Records</div>
-        <div style="font-family:'Barlow Condensed',sans-serif;font-size:28px;color:var(--text-light);font-weight:700;">350K+</div>
-      </div>
-      <div style="text-align:center;">
-        <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--ups-gold);letter-spacing:2px;text-transform:uppercase;">API Endpoints</div>
-        <div style="font-family:'Barlow Condensed',sans-serif;font-size:28px;color:var(--text-light);font-weight:700;">18+</div>
-      </div>
-      <div style="text-align:center;">
-        <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--ups-gold);letter-spacing:2px;text-transform:uppercase;">Privacy Floor</div>
-        <div style="font-family:'Barlow Condensed',sans-serif;font-size:28px;color:var(--text-light);font-weight:700;">N≥5</div>
-      </div>
-      <div style="text-align:center;">
-        <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--ups-gold);letter-spacing:2px;text-transform:uppercase;">Problem Reqs</div>
-        <div style="font-family:'Barlow Condensed',sans-serif;font-size:28px;color:var(--text-light);font-weight:700;">100%</div>
-      </div>
-    </div>
-  </div>
-
-  <div class="slide-footer">
-    <span>UPS SYNAPSE OPS — CONFIDENTIAL</span>
-    <span>TEAM PRESENTATION — LOGISTICS OPERATIONS EXCELLENCE HACKATHON</span>
-    <span>09 / 09</span>
-  </div>
-</div>
-
-<!-- ── JS ── -->
 <script>
-  let current = 0;
-  const slides = document.querySelectorAll('.slide');
-  const navBtns = document.querySelectorAll('.nav-btn');
-  const counter = document.getElementById('counter');
-
-  function goTo(n) {
-    slides[current].classList.remove('active');
-    navBtns[current].classList.remove('active');
-    current = n;
-    slides[current].classList.add('active');
-    navBtns[current].classList.add('active');
-    counter.textContent = `SLIDE ${String(n+1).padStart(2,'0')} / 09`;
-  }
-
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'ArrowRight' || e.key === 'ArrowDown' || e.key === 'PageDown') {
-      if (current < slides.length - 1) goTo(current + 1);
-    }
-    if (e.key === 'ArrowLeft' || e.key === 'ArrowUp' || e.key === 'PageUp') {
-      if (current > 0) goTo(current - 1);
-    }
-  });
+let cur=0;
+const slides=document.querySelectorAll('.slide');
+const btns=document.querySelectorAll('.nav-btn');
+function goTo(n){slides[cur].classList.remove('active');btns[cur].classList.remove('active');cur=n;slides[cur].classList.add('active');btns[cur].classList.add('active');}
+function next(){if(cur<slides.length-1)goTo(cur+1);}
+function prev(){if(cur>0)goTo(cur-1);}
+document.addEventListener('keydown',e=>{
+  if(e.key==='ArrowRight'||e.key==='ArrowDown'||e.key==='PageDown'||e.key===' ')next();
+  if(e.key==='ArrowLeft'||e.key==='ArrowUp'||e.key==='PageUp')prev();
+});
 </script>
-
 </body>
 </html>

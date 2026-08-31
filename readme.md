@@ -18,3 +18,10 @@ Decision variables: for every (worker, shift, process) triple, a boolean "is thi
 Hard constraints: a worker can only be assigned if certified for that process; at most one shift+process per worker per day; anyone who worked Twilight/Night yesterday cannot work Day today (11-hour rest rule, checked against real shift_schedule history)
 Objective: minimize 1000×shortfall + 100×overstaffing + wage_cost, i.e. hitting headcount targets matters ~10x more than avoiding overstaffing, which matters more than minimizing payroll
 This is the piece that was completely broken before my fixes — it referenced a nonexistent cp_model.datetime attribute and crashed every single time, silently swallowed by the frontend's fallback logic. It now genuinely solves and returns real assignments (87 real worker-shift-process assignments in my test run), which feed the Gantt chart in Workforce Planner.
+
+# venv
+cd /home/susan/Development/logistics-operational-excellence
+source .venv/bin/activate
+
+cd /home/susan/Development/logistics-operational-excellence
+PYTHONPATH=. uvicorn backend.app.main:app --host 0.0.0.0 --port 8000 --reload
